@@ -15,7 +15,11 @@ class MyPIXNoteExtension(PIXObject):
 
 ###Environment Variables 
     TIP: set these before launching
-`PIX_API_URL` : URL to the PIX API (currently "project.pixsystem.com") 
+
+`PIX_API_URL` : URL to the PIX API (currently "project.pixsystem.com")
+
 `PIX_APP_KEY` : PIX API key provided through the PIX developer portal
+
 `PIX_USERNAME` : PIX username
+
 `PIX_PASSWORD` : PIX password
