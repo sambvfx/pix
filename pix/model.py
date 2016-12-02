@@ -174,6 +174,40 @@ class PIXProject(PIXObject):
         return self.session.delete(url)
 
 
+@pix.factory.Factory.register('PIXShareFeedEntry')
+class PIXShareFeedEntry(PIXObject):
+    """
+    Class representing a feed.
+    """
+    def iter_attachments(self):
+        """
+        Iterate over the feeds attachments.
+
+        Yields
+        ------
+        ``pix.model.PIXObject``
+        """
+        for attachment in self.attachments['list']:
+            yield attachment
+
+    def get_attachment(self, name):
+        """
+        Return the first attachment found with a specific name.
+
+        Parameters
+        ----------
+        name : str
+
+        Returns
+        -------
+        ``pix.model.PIXObject``
+        """
+        for x in self.iter_attachments():
+            identifier = x.get('label') or x['id']
+            if identifier == name:
+                return x
+
+
 @pix.factory.Factory.register('PIXClip')
 @pix.factory.Factory.register('PIXImage')
 class PIXAttachment(PIXObject):
