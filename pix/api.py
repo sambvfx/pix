@@ -146,6 +146,7 @@ class Session(object):
         Get a PIX session
         """
         self.headers['X-PIX-App-Key'] = app_key
+        print self.baseURL + '/session'
         result = requests.put(url=self.baseURL + '/session/',
                               headers=self.headers, data=payload)
         self.cookies = result.cookies
@@ -225,8 +226,9 @@ class Session(object):
 
         Examples
         --------
-        >>> with self.header({'Accept': 'text/xml'}):
-        ...     response = self.get('/media/1234/markup')
+        >>> session = Session()
+        >>> with session.header({'Accept': 'text/xml'}):
+        ...     response = session.get('/media/1234/markup')
 
         Parameters
         ----------

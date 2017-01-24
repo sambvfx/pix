@@ -148,20 +148,38 @@ class PIXProject(PIXObject):
         return self.session.get(url)
 
     @activate_project
-    def get_inbox(self, limit=25):
+    def get_inbox(self, limit=None):
         """
         Load logged-in user's inbox
+
+        Parameters
+        ----------
+        limit : int
         """
-        assert isinstance(limit, int)
-        url = "/feeds/incoming?limit={0}".format(limit)
+        url = '/feeds/incoming'
+        if limit is not None:
+            url += '?limit={0}'.format(limit)
         return self.session.get(url)
+
+    @activate_project
+    def iter_unread(self):
+        """
+        Find all unread messages.
+
+        Yields
+        ------
+        ``PIXShareFeedEntry``
+        """
+        for feed in self.get_inbox():
+            if not feed.viewed:
+                yield feed
 
     @activate_project
     def mark_as_read(self, item):
         """
         Mark's an item in logged-in user's inbox as read.
         """
-        url = "/items/{0}".format(item['id'])
+        url = '/items/{0}'.format(item['id'])
         payload = json.dumps({'flags': {'viewed': 'true'}})
         return self.session.put(url, payload)
 
@@ -170,7 +188,7 @@ class PIXProject(PIXObject):
         """
         Delete item from inbox
         """
-        url = "/messages/inbox/{0}".format(item['id'])
+        url = '/messages/inbox/{0}'.format(item['id'])
         return self.session.delete(url)
 
 
@@ -179,6 +197,14 @@ class PIXShareFeedEntry(PIXObject):
     """
     Class representing a feed.
     """
+    def mark_as_read(self):
+        """
+        Mark's an item in logged-in user's inbox as read.
+        """
+        url = '/items/{0}'.format(self['id'])
+        payload = json.dumps({'flags': {'viewed': 'true'}})
+        return self.session.put(url, payload)
+
     def iter_attachments(self):
         """
         Iterate over the feeds attachments.
@@ -214,12 +240,14 @@ class PIXAttachment(PIXObject):
     """
     Class representing an attached item.
     """
-    def get_notes(self):
+    def get_notes(self, limit=None):
         """
         Get notes.
         """
         if self['notes']['has_notes']:
-            url = '/items/{0}/notes?limit=100'.format(self['id'])
+            url = '/items/{0}/notes'.format(self['id'])
+            if limit is not None:
+                url += '?limit={0}'.format(limit)
             return self.session.get(url)
         return []
 
