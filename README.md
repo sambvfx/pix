@@ -11,7 +11,7 @@ class MyPIXNoteExtension(PIXObject):
         ...
 ```
 
- Check out `pix.model` for a few simple examples. Additional contributions are welcomed to expand the base set of helper methods available!
+ Check out `pix.model` for a few simple examples.
 
 ###Environment Variables 
     TIP: set these before launching
