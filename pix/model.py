@@ -27,9 +27,13 @@ class PIXObject(dict):
             {k: self.factory.objectfy(v)
              for k, v in dict(*args, **kwargs).iteritems()})
 
+    @property
+    def identifier(self):
+        return self.get('label') or self['id']
+
     def __repr__(self):
-        identifier = self.get('label') or self['id']
-        return '<{0}({1!r})>'.format(self.__class__.__name__, str(identifier))
+        return '<{0}({1!r})>'.format(
+            self.__class__.__name__, str(self.identifier))
 
     def __dir__(self):
         def get_attrs(obj):
@@ -178,6 +182,10 @@ class PIXProject(PIXObject):
     def mark_as_read(self, item):
         """
         Mark's an item in logged-in user's inbox as read.
+
+        Parameters
+        ----------
+        item : ``PIXObject``
         """
         url = '/items/{0}'.format(item['id'])
         payload = json.dumps({'flags': {'viewed': 'true'}})
@@ -186,7 +194,11 @@ class PIXProject(PIXObject):
     @activate_project
     def delete_inbox_item(self, item):
         """
-        Delete item from inbox
+        Delete item from the inbox.
+
+        Parameters
+        ----------
+        item : ``PIXObject``
         """
         url = '/messages/inbox/{0}'.format(item['id'])
         return self.session.delete(url)
@@ -211,7 +223,7 @@ class PIXShareFeedEntry(PIXObject):
 
         Yields
         ------
-        ``pix.model.PIXObject``
+        ``PIXObject``
         """
         for attachment in self.attachments['list']:
             yield attachment
@@ -226,7 +238,7 @@ class PIXShareFeedEntry(PIXObject):
 
         Returns
         -------
-        ``pix.model.PIXObject``
+        ``PIXObject``
         """
         for x in self.iter_attachments():
             identifier = x.get('label') or x['id']
@@ -243,6 +255,17 @@ class PIXAttachment(PIXObject):
     def get_notes(self, limit=None):
         """
         Get notes.
+
+        Parameters
+        ----------
+        limit : int
+            Specify a limit of notes to return to the REST call.
+            NOTE: It appears the default limit if this argument is not provided
+                  is 50?
+
+        Returns
+        -------
+        list[``PIXNote``]
         """
         if self['notes']['has_notes']:
             url = '/items/{0}/notes'.format(self['id'])

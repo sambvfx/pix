@@ -267,6 +267,13 @@ class Session(object):
 
     @property
     def project_names(self):
+        """
+        Get all project names.
+
+        Returns
+        -------
+        dict[str, ``pix.model.PIXProject``]
+        """
         if self._project_names is None:
             self.get_projects()
         return self._project_names
