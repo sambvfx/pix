@@ -58,13 +58,7 @@ def _import_modules(paths):
 
     results = []
     for mod in modules:
-        try:
-            results.append(imp.load_source(uuid.uuid4().hex, mod))
-        except Exception as error:
-            logger.warning(
-                'Failed to load from plugin path '
-                '{0!r}: {1!r}'.format(mod, error))
-            continue
+        results.append(imp.load_source(uuid.uuid4().hex, mod))
     return results
 
 
@@ -109,7 +103,6 @@ class Session(object):
     ...         if not feed.viewed:
     ...             print feed
     """
-
     def __init__(self, host=None, app_key=None, username=None, password=None,
                  plugin_paths=None):
         """
