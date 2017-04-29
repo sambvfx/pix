@@ -1,3 +1,5 @@
-Pillow==3.3.1
-CairoSVG==1.0.22
-requests==2.9.1
+six
+typing
+requests
+Pillow
+CairoSVG

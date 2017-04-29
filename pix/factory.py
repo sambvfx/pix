@@ -1,6 +1,12 @@
 """
 PIX class factory module.
 """
+from typing import TYPE_CHECKING, Type, Iterator
+
+
+if TYPE_CHECKING:
+    import pix.api
+    import pix.model
 
 
 class Factory(object):
@@ -25,24 +31,24 @@ class Factory(object):
         """
         Parameters
         ----------
-        session : ``pix.api.Session``
+        session : pix.api.Session
         """
         self.session = session
 
     @classmethod
-    def register(cls, pixCls):
+    def register(cls, name):
         """
         Decorator for registering an new PIX base class.
 
         Parameters
         ----------
-        pixCls : str
+        name : str
             PIX class name. e.g. 'PIXImage'
         """
         def _deco(klass):
-            bases = cls._registered.get(pixCls, [])
+            bases = cls._registered.get(name, [])
             bases.append(klass)
-            cls._registered[pixCls] = bases
+            cls._registered[name] = bases
             return klass
 
         return _deco
@@ -61,7 +67,7 @@ class Factory(object):
 
         Returns
         -------
-        Type[``pix.model.PIXObject``]
+        Type[pix.model.PIXObject]
         """
         import pix.model
         # look for registered base classes and if none use the base object
@@ -80,11 +86,11 @@ class Factory(object):
         ----------
         data : dict
 
-        Yields
-        ------
-        dict
+        Returns
+        -------
+        Iterator[dict]
         """
-        for k, v in data.iteritems():
+        for k, v in data.items():
             if isinstance(v, dict):
                 yield v
             elif isinstance(v, (set, list, tuple)):
@@ -103,9 +109,9 @@ class Factory(object):
             Recursively look into generated objects and include their children
             too.
 
-        Yields
-        ------
-        ``pix.model.PIXObject``
+        Returns
+        -------
+        Iterator[pix.model.PIXObject]
         """
         pixCls = data.get('class')
         if pixCls:
@@ -118,7 +124,7 @@ class Factory(object):
 
     def objectfy(self, data):
         """
-        Replace any viable structures with ``pix.model.PIXObject``.
+        Replace any viable structures with `pix.model.PIXObject`.
         """
         if isinstance(data, dict):
             objCls = data.get('class')
@@ -126,7 +132,7 @@ class Factory(object):
                 obj = self.get_pix_cls(objCls)
                 return obj(self, data)
             else:
-                return {k: self.objectfy(v) for k, v in data.iteritems()}
+                return {k: self.objectfy(v) for k, v in data.items()}
         elif isinstance(data, (tuple, list, set)):
             results = [self.objectfy(x) for x in data]
             if isinstance(data, tuple):
@@ -136,3 +142,6 @@ class Factory(object):
             return results
         else:
             return data
+
+
+register = Factory.register

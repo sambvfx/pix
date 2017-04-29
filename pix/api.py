@@ -4,11 +4,68 @@ Main PIX API module.
 import os
 import requests
 import json
-
-from base64 import b64decode
+import six
 
 import pix.factory
 import pix.exc
+
+import logging
+
+from typing import TYPE_CHECKING, Optional, Union, List, Dict
+
+
+if TYPE_CHECKING:
+    import pix.model
+
+
+logger = logging.getLogger(__name__)
+
+
+def _import_modules(paths):
+    """
+    Import modules.
+
+    Parameters
+    ----------
+    paths : Union[str, List[str]]
+
+    Returns
+    -------
+    module
+    """
+    import imp
+    import uuid
+
+    suffixes = tuple([x[0] for x in imp.get_suffixes()])
+
+    modules = set()
+
+    if isinstance(paths, six.string_types):
+        paths = paths.split(os.pathsep)
+
+    for path in paths:
+        path = os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
+        # ignore empty paths
+        path = path.strip()
+        if not path:
+            continue
+        if os.path.isfile(path) and path.endswith(suffixes):
+            modules.add(path)
+        for base, directories, filenames in os.walk(path):
+            for filename in filenames:
+                if filename.endswith(suffixes):
+                    modules.add(os.path.join(base, filename))
+
+    results = []
+    for mod in modules:
+        try:
+            results.append(imp.load_source(uuid.uuid4().hex, mod))
+        except Exception as error:
+            logger.warning(
+                'Failed to load from plugin path '
+                '{0!r}: {1!r}'.format(mod, error))
+            continue
+    return results
 
 
 class SessionHeader(object):
@@ -16,6 +73,12 @@ class SessionHeader(object):
     Context manager for temporarily changing the session headers.
     """
     def __init__(self, session, headers):
+        """
+        Parameters
+        ----------
+        session : Session
+        headers : dict
+        """
         super(SessionHeader, self).__init__()
         self._session = session
         self.original = None
@@ -32,7 +95,7 @@ class SessionHeader(object):
 
 class Session(object):
     """
-    A ``Session`` manages all API calls to the PIX REST endpoints. It manages
+    A Session manages all API calls to the PIX REST endpoints. It manages
     the current PIX session including the user logging in and the current
     active project. PIX REST calls return results differently depending on
     the active user and project.
@@ -47,38 +110,39 @@ class Session(object):
     ...             print feed
     """
 
-    def __init__(self, host=None, app_key=None, username=None, password=None):
+    def __init__(self, host=None, app_key=None, username=None, password=None,
+                 plugin_paths=None):
         """
         Parameters
         ----------
-        host : str | None
+        host : Optional[str]
             The host PIX API url. If None, then the environment variable
             PIX_API_URL will be used.
-        app_key : str | None
+        app_key : Optional[str]
             The host PIX API KEY. If None, then the environment variable
             PIX_APP_KEY will be used.
-        username : str | None
+        username : Optional[str]
             The PIX username used for logging in. If None, then the environment
             variable PIX_USERNAME will be used.
-        password : str | None
+        password : Optional[str]
             The PIX password associated with `username` used for logging in.
             If None, then the environment variable PIX_PASSWORD will be used.
-            NOTE: An encoded `b64encode('password')` version may be used to
-                  slightly obfuscate passwords stored as plain text.
+        plugin_paths : Optional[List[str]]
+            Paths to custom modules or packages that should be loaded prior to 
+            constructing any objects via the factory. This allows for 
+            registration of any custom bases within the factory. If None, 
+            the environment variable PIX_PLUGIN_PATH will be used.
         """
         host = host or os.environ.get('PIX_API_URL')
-
         password = password or os.environ.get('PIX_PASSWORD')
-
-        # FIXME: Come up with something better?
-        # encoded password provided?
-        try:
-            password = b64decode(password)
-        except TypeError:
-            pass
-
         app_key = app_key or os.environ.get('PIX_APP_KEY')
         username = username or os.environ.get('PIX_USERNAME')
+
+        plugin_paths = plugin_paths or os.environ.get('PIX_PLUGIN_PATH')
+        if plugin_paths:
+            _import_modules(plugin_paths)
+
+        self.factory = pix.factory.Factory(self)
 
         self._projects = None
         self._project_names = None
@@ -93,7 +157,6 @@ class Session(object):
         self.baseURL = 'https://{0}/developer/api/2'.format(host)
         self.cookies = None
 
-        self.factory = pix.factory.Factory(self)
         self.login(app_key=app_key, username=username, password=password)
 
     def __enter__(self):
@@ -117,17 +180,12 @@ class Session(object):
 
         Parameters
         ----------
-        app_key : str | None
-            The host PIX API KEY. If None, then the environment variable
-            PIX_APP_KEY will be used.
-        username : str | None
-            The PIX username used for logging in. If None, then the environment
-            variable PIX_USERNAME will be used.
-        password : str | None
+        app_key : str
+            The host PIX API KEY.
+        username : str
+            The PIX username used for logging in.
+        password : str
             The PIX password associated with `username` used for logging in.
-            If None, then the environment variable PIX_PASSWORD will be used.
-            NOTE: An encoded `b64encode('password')` version may be used to
-                  slightly obfuscate passwords stored as plain text.
         """
         payload = json.dumps({'username': username, 'password': password})
         result = self.session(app_key, payload)
@@ -146,7 +204,7 @@ class Session(object):
         Get a PIX session
         """
         self.headers['X-PIX-App-Key'] = app_key
-        print self.baseURL + '/session'
+        logger.info(self.baseURL + '/session')
         result = requests.put(url=self.baseURL + '/session/',
                               headers=self.headers, data=payload)
         self.cookies = result.cookies
@@ -172,10 +230,6 @@ class Session(object):
         """
         PUT REST call
         """
-        try:
-            self.cookies
-        except AttributeError:
-            self.cookies = None
         if self.baseURL not in url:
             url = self.baseURL + url
         return requests.put(url=url, cookies=self.cookies,
@@ -210,11 +264,14 @@ class Session(object):
 
     def process_result(self, raw_result):
         """
-        Process request results. This utilizes the `pix.api.factory.Factory`
+        Process request results. This utilizes the `pix.factory.Factory`
         to premote certain elements within the raw results to dict-like
         objects. These objects may be built with base classes registered with
-        the factory to offer additional helper methods. See
-        `pix.api.factory.Factory` for more information.
+        the factory to offer additional helper methods. 
+        
+        See Also
+        --------
+        pix.factory.Factory
         """
         if self.headers['Accept'] != 'application/json;charset=utf-8':
             return raw_result
@@ -236,7 +293,7 @@ class Session(object):
 
         Returns
         -------
-        ``SessionHeader``
+        SessionHeader
         """
         return SessionHeader(self, headers)
 
@@ -246,7 +303,7 @@ class Session(object):
 
         Returns
         -------
-        list[``pix.model.PIXProject``]
+        List[pix.model.PIXProject]
         """
         if self._session is None:
             raise pix.exc.PIXError(
@@ -272,7 +329,7 @@ class Session(object):
 
         Returns
         -------
-        dict[str, ``pix.model.PIXProject``]
+        Dict[str, pix.model.PIXProject]
         """
         if self._project_names is None:
             self.get_projects()
@@ -284,13 +341,13 @@ class Session(object):
 
         Parameters
         ----------
-        project : str | ``pix.model.PIXProject``
+        project : Union[str, pix.model.PIXProject]
 
         Returns
         -------
-        ``pix.model.PIXProject``
+        pix.model.PIXProject
         """
-        if isinstance(project, basestring):
+        if isinstance(project, six.string_types):
             project = self.project_names[project]
         request_dict = {'id': project.id}
         url = '/session/active_project'

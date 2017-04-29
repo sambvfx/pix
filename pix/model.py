@@ -3,8 +3,15 @@ PIX object/model module.
 """
 import functools
 import json
-import pix.factory
 import pix.exc
+from pix.factory import register
+
+from typing import TYPE_CHECKING, Iterator, Optional, Dict
+
+
+if TYPE_CHECKING:
+    import pix.factory
+    import pix.model
 
 
 class PIXObject(dict):
@@ -18,14 +25,14 @@ class PIXObject(dict):
         """
         Parameters
         ----------
-        factory : ``pix.factory.Factory``
+        factory : pix.factory.Factory
             Factory used to generate this instance.
         """
         self.factory = factory
         self.session = factory.session
         super(PIXObject, self).__init__(
             {k: self.factory.objectfy(v)
-             for k, v in dict(*args, **kwargs).iteritems()})
+             for k, v in dict(*args, **kwargs).items()})
 
     @property
     def identifier(self):
@@ -76,7 +83,7 @@ class PIXObject(dict):
 
         Returns
         -------
-        list[``pix.model.PIXObject``]
+        List[pix.model.PIXObject]
         """
         results = []
         # iter contents first so we don't include ourselves
@@ -86,8 +93,8 @@ class PIXObject(dict):
         return results
 
 
-@pix.factory.Factory.register('PIXPlaylist')
-@pix.factory.Factory.register('PIXFolder')
+@register('PIXPlaylist')
+@register('PIXFolder')
 class PIXContainer(PIXObject):
     """
     Container class requires an additional call to get its contents.
@@ -107,7 +114,7 @@ class PIXContainer(PIXObject):
 
         Returns
         -------
-        list[``pix.model.PIXObject``]
+        List[pix.model.PIXObject]
         """
         results = []
         for data in self.get_contents():
@@ -118,7 +125,7 @@ class PIXContainer(PIXObject):
 
 def activate_project(func):
     """
-    Simple decorator for ``PIXProject`` methods that issue API calls to
+    Simple decorator for `PIXProject` methods that issue API calls to
     insures the project is set as the active project in the current session.
     """
     @functools.wraps(func)
@@ -128,7 +135,7 @@ def activate_project(func):
     return _wrap
 
 
-@pix.factory.Factory.register('PIXProject')
+@register('PIXProject')
 class PIXProject(PIXObject):
     """
     A project is where most of the interfacing currently takes place because
@@ -170,9 +177,9 @@ class PIXProject(PIXObject):
         """
         Find all unread messages.
 
-        Yields
-        ------
-        ``PIXShareFeedEntry``
+        Returns
+        -------
+        Iterator[PIXShareFeedEntry]
         """
         for feed in self.get_inbox():
             if not feed.viewed:
@@ -185,7 +192,7 @@ class PIXProject(PIXObject):
 
         Parameters
         ----------
-        item : ``PIXObject``
+        item : PIXObject
         """
         url = '/items/{0}'.format(item['id'])
         payload = json.dumps({'flags': {'viewed': 'true'}})
@@ -198,13 +205,13 @@ class PIXProject(PIXObject):
 
         Parameters
         ----------
-        item : ``PIXObject``
+        item : PIXObject
         """
         url = '/messages/inbox/{0}'.format(item['id'])
         return self.session.delete(url)
 
 
-@pix.factory.Factory.register('PIXShareFeedEntry')
+@register('PIXShareFeedEntry')
 class PIXShareFeedEntry(PIXObject):
     """
     Class representing a feed.
@@ -221,9 +228,9 @@ class PIXShareFeedEntry(PIXObject):
         """
         Iterate over the feeds attachments.
 
-        Yields
-        ------
-        ``PIXObject``
+        Returns
+        -------
+        Iterator[PIXObject]
         """
         for attachment in self.attachments['list']:
             yield attachment
@@ -238,7 +245,7 @@ class PIXShareFeedEntry(PIXObject):
 
         Returns
         -------
-        ``PIXObject``
+        PIXObject
         """
         for x in self.iter_attachments():
             identifier = x.get('label') or x['id']
@@ -246,8 +253,8 @@ class PIXShareFeedEntry(PIXObject):
                 return x
 
 
-@pix.factory.Factory.register('PIXClip')
-@pix.factory.Factory.register('PIXImage')
+@register('PIXClip')
+@register('PIXImage')
 class PIXAttachment(PIXObject):
     """
     Class representing an attached item.
@@ -265,7 +272,7 @@ class PIXAttachment(PIXObject):
 
         Returns
         -------
-        list[``PIXNote``]
+        List[PIXNote]
         """
         if self['notes']['has_notes']:
             url = '/items/{0}/notes'.format(self['id'])
@@ -275,7 +282,7 @@ class PIXAttachment(PIXObject):
         return []
 
 
-@pix.factory.Factory.register('PIXNote')
+@register('PIXNote')
 class PIXNote(PIXObject):
     """
     Class representing a note.
@@ -315,7 +322,7 @@ class PIXNote(PIXObject):
 
         Returns
         -------
-        ``PIL.Image`` | None
+        Optional[PIL.Image]
         """
         results = self._get_original()
         if results:
@@ -329,7 +336,7 @@ class PIXNote(PIXObject):
 
         Returns
         -------
-        ``PIL.Image`` | None
+        Optional[PIL.Image]
         """
         results = self.get_media('markup')
         if results:
@@ -345,13 +352,12 @@ class PIXNote(PIXObject):
 
         Returns
         -------
-        ``PIL.Image``
+        Optional[PIL.Image]
         """
+        # FIXME: There should be a endpoint that returns this already
+        # composited together.
         bg = self.get_original()
-        if bg is None:
-            raise pix.exc.PIXError('No original image found!')
         fg = self.get_markup()
-        if fg is None:
-            raise pix.exc.PIXError('No markup found!')
-        bg.paste(fg, (0, 0), fg)
-        return bg
+        if bg and fg:
+            bg.paste(fg, (0, 0), fg)
+            return bg

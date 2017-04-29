@@ -1,25 +1,46 @@
 A python api for interacting with [PIX](www.pixsystem.com/). It's goal is to provide a more object-oriented experience when interacting with PIX's REST API. It provides simplified ways to add custom behaviors to the objects returned from PIX that are specific for your needs.
 
+
+Examples
+--------
+
+Inject your own custom behaviors onto the dynamically created PIX objects. These can exist in your own code repository and can be added to the [factory](https://github.com/sambvfx/pix/blob/master/pix/factory.py) via the environment variable `PIX_PLUGIN_PATH`.
+
+For example:
+
 ```python
-import pix.factory
+# mypixmodels.py
+
+from pix.factory import register
 from pix.model import PIXObject
 
 
-@pix.factory.Factory.register('PIXNote')
+@register('PIXNote')
 class MyPIXNoteExtension(PIXObject):
-    def custom_method(self):
-        ...
+    def ingest(self):
+        print 'Ingesting note!'
+        # handle note ingesting
+
 ```
 
- Check out `pix.model` for a few simple examples.
+Exporting these environment variables before launching our python session simplifies the process within python. However these can also be provided to the `Session` directly if needed.
 
-###Environment Variables 
-    TIP: set these before launching
+```bash
+$ export PIX_API_URL='project.pixsystem.com'
+$ export PIX_APP_KEY='123abc'
+$ export PIX_USERNAME='sambvfx'
+$ export PIX_PASSWORD='mypassword'
+$ export PIX_PLUGIN_PATH=/path/to/mypixmodels.py:/path/to/other/package
+```
 
-`PIX_API_URL` : URL to the PIX API (currently "project.pixsystem.com")
+Our custom `ingest` method is now available on the note!
 
-`PIX_APP_KEY` : PIX API key provided through the PIX developer portal
+```python
+import pix.api
 
-`PIX_USERNAME` : PIX username
-
-`PIX_PASSWORD` : PIX password
+with pix.api.Session() as session:
+    project = session.get_project('PROJECT_NAME')
+    for feed in project.iter_unread():
+        for note in feed.get_notes():
+            note.ingest()
+```
