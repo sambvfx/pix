@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Iterator, Optional, Dict
 
 if TYPE_CHECKING:
     import pix.factory
-    import pix.model
 
 
 class PIXObject(dict):

@@ -11,7 +11,7 @@ import pix.exc
 
 import logging
 
-from typing import TYPE_CHECKING, Optional, Union, List, Dict
+from typing import TYPE_CHECKING, Optional, Union, List, Dict, Any
 
 
 if TYPE_CHECKING:
@@ -249,6 +249,10 @@ class Session(object):
     def get(self, url):
         """
         GET REST call
+        
+        Returns
+        -------
+        Union[requests.Response, pix.model.PIXObject, Dict[str, Any]]
         """
         if self.baseURL not in url:
             url = self.baseURL + url
@@ -265,6 +269,10 @@ class Session(object):
         See Also
         --------
         pix.factory.Factory
+        
+        Returns
+        -------
+        Union[requests.Response, pix.model.PIXObject, Dict[str, Any]]
         """
         if self.headers['Accept'] != 'application/json;charset=utf-8':
             return raw_result
