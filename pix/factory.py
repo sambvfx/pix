@@ -1,7 +1,7 @@
 """
 PIX class factory module.
 """
-from typing import TYPE_CHECKING, Type, Iterator
+from typing import TYPE_CHECKING, Type, Iterator, Dict
 
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ class Factory(object):
         return _deco
 
     @classmethod
-    def get_pix_cls(cls, name):
+    def build_obj(cls, name):
         """
         Build a pix object class with the given name. Any registered bases
         keyed for `name` will be used or the base ``pix.model.PIXObject``
@@ -113,9 +113,9 @@ class Factory(object):
         -------
         Iterator[pix.model.PIXObject]
         """
-        pixCls = data.get('class')
-        if pixCls:
-            obj = self.get_pix_cls(pixCls)
+        name = data.get('class')
+        if name:
+            obj = self.build_obj(name)
             yield obj(self, data)
         if recursive:
             for x in self.iter_contents(data):
@@ -125,11 +125,19 @@ class Factory(object):
     def objectfy(self, data):
         """
         Replace any viable structures with `pix.model.PIXObject`.
+        
+        Parameters
+        ----------
+        data : Union[Dict[str, Any], Any]
+        
+        Returns
+        -------
+        Union[pix.model.PIXObject, Dict[str, Any], Any]
         """
         if isinstance(data, dict):
-            objCls = data.get('class')
-            if objCls:
-                obj = self.get_pix_cls(objCls)
+            name = data.get('class')
+            if name:
+                obj = self.build_obj(name)
                 return obj(self, data)
             else:
                 return {k: self.objectfy(v) for k, v in data.items()}

@@ -3,6 +3,7 @@ PIX object/model module.
 """
 import functools
 import json
+import six
 import pix.exc
 from pix.factory import register
 
@@ -20,6 +21,9 @@ class PIXObject(dict):
     This is simply a wrapper of a dictionary to provide additional helper
     methods and reduce complexity of large data structures.
     """
+    # since we're inheriting from dict having __dict__ is redundant
+    __slots__ = ()
+
     def __init__(self, factory, *args, **kwargs):
         """
         Parameters
@@ -73,7 +77,7 @@ class PIXObject(dict):
         return dir2(self) + self.keys()
 
     def __getattr__(self, item):
-        # This makes either self['attribute'] or self.attribute work.
+        # This makes either `self['attribute']` or `self.attribute` work.
         return self[item]
 
     def children(self):
@@ -122,34 +126,54 @@ class PIXContainer(PIXObject):
             return results
 
 
-def activate_project(func):
+class _ActiveProject(type):
     """
-    Simple decorator for `PIXProject` methods that issue API calls to
-    insures the project is set as the active project in the current session.
+    Metaclass that wraps all instance methods to first ensure that the project 
+    is current active project in the session. 
+    
+    The use of a metaclass has advantages of also affecting instance methods 
+    on sub-classes of `PIXProject`.
     """
-    @functools.wraps(func)
-    def _wrap(self, *args, **kwargs):
-        self.set_active()
-        return func(self, *args, **kwargs)
-    return _wrap
+    @staticmethod
+    def activate_project(func):
+        """
+        Simple decorator for `PIXProject` methods that issue API calls to
+        insures the project is set as the active project in the current 
+        session.
+        """
+        @functools.wraps(func)
+        def _wrap(self, *args, **kwargs):
+            if self.session.active_project != self:
+                self.session.load_project(self)
+            return func(self, *args, **kwargs)
+
+        return _wrap
+
+    def __new__(cls, name, bases, attrs):
+        """
+        Get a new project class wrapping any instance methods to ensure the 
+        project instance is the active project within the current session.
+        """
+        newattrs = {}
+        for k, v in attrs.items():
+            if callable(v):
+                newattrs[k] = cls.activate_project(v)
+            else:
+                newattrs[k] = v
+
+        return super(_ActiveProject, cls).__new__(cls, name, bases, newattrs)
 
 
 @register('PIXProject')
+@six.add_metaclass(_ActiveProject)
 class PIXProject(PIXObject):
     """
-    A project is where most of the interfacing currently takes place because
-    the content we fetch is dependent on the current project loaded. Any API
-    call that returns results differently depending on the current loaded
-    project should live here.
+    Represents a PIX project.
+    
+    The PIXProject has some additional magic where it will switch the current
+    session's active project when any instance methods are called. See 
+    `_ActiveProject` metaclass for more information.
     """
-    def set_active(self):
-        """
-        Log into a project.
-        """
-        if self.session.active_project != self:
-            self.session.load_project(self)
-
-    @activate_project
     def load_item(self, item_id):
         """
         Loads an item from PIX.
@@ -157,7 +181,6 @@ class PIXProject(PIXObject):
         url = '/items/{0}'.format(item_id)
         return self.session.get(url)
 
-    @activate_project
     def get_inbox(self, limit=None):
         """
         Load logged-in user's inbox
@@ -171,7 +194,6 @@ class PIXProject(PIXObject):
             url += '?limit={0}'.format(limit)
         return self.session.get(url)
 
-    @activate_project
     def iter_unread(self):
         """
         Find all unread messages.
@@ -184,7 +206,6 @@ class PIXProject(PIXObject):
             if not feed.viewed:
                 yield feed
 
-    @activate_project
     def mark_as_read(self, item):
         """
         Mark's an item in logged-in user's inbox as read.
@@ -197,7 +218,6 @@ class PIXProject(PIXObject):
         payload = json.dumps({'flags': {'viewed': 'true'}})
         return self.session.put(url, payload)
 
-    @activate_project
     def delete_inbox_item(self, item):
         """
         Delete item from the inbox.
