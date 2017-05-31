@@ -12,4 +12,5 @@ setup(
     long_description=__doc__,
     author='Sam Bourne',
     packages=['pix'],
+    extras_require={'tests': ['pytest', 'mock']}
 )
