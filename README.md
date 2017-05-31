@@ -1,6 +1,24 @@
 A python api for interacting with [PIX](www.pixsystem.com/). It's goal is to provide a more object-oriented experience when interacting with PIX's REST API. It provides simplified ways to add custom behaviors to the objects returned from PIX that are specific for your needs.
 
 
+Setup
+-----
+First clone the repo somewhere.
+
+```bash
+git clone https://github.com/sambvfx/pix.git
+cd pix
+pip install -r requirements.txt .
+```
+
+If you wish to contribute back please install the test dependencies using the `tests` bundle.
+
+```bash
+pip install ".[tests]"
+```
+
+
+
 Examples
 --------
 

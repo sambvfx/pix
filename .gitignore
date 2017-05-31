@@ -1,4 +1,7 @@
+.cache/
 .idea/
 venv/
+venv3/
 bin/
+local/
 *.pyc
