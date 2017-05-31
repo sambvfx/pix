@@ -2,4 +2,4 @@ six
 typing
 requests
 Pillow
-CairoSVG
+CairoSVG==1.0.22
