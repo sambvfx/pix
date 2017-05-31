@@ -8,6 +8,7 @@ import six
 
 import pix.factory
 import pix.exc
+import pix.utils
 
 import logging
 
@@ -19,47 +20,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-def _import_modules(paths):
-    """
-    Import modules.
-
-    Parameters
-    ----------
-    paths : Union[str, List[str]]
-
-    Returns
-    -------
-    module
-    """
-    import imp
-    import uuid
-
-    suffixes = tuple([x[0] for x in imp.get_suffixes()])
-
-    modules = set()
-
-    if isinstance(paths, six.string_types):
-        paths = paths.split(os.pathsep)
-
-    for path in paths:
-        path = os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
-        # ignore empty paths
-        path = path.strip()
-        if not path:
-            continue
-        if os.path.isfile(path) and path.endswith(suffixes):
-            modules.add(path)
-        for base, directories, filenames in os.walk(path):
-            for filename in filenames:
-                if filename.endswith(suffixes):
-                    modules.add(os.path.join(base, filename))
-
-    results = []
-    for mod in modules:
-        results.append(imp.load_source(uuid.uuid4().hex, mod))
-    return results
 
 
 class SessionHeader(object):
@@ -98,10 +58,11 @@ class Session(object):
     --------
     >>> session = Session()
     ... for project in session.get_projects():
-    ...     print project.label
     ...     for feed in project.get_inbox():
     ...         if not feed.viewed:
-    ...             print feed
+    ...             for attachment in feed.iter_attachments():
+    ...                 for note in attachment.get_notes():
+    ...                     # do something with note
     """
     def __init__(self, host=None, app_key=None, username=None, password=None,
                  plugin_paths=None):
@@ -133,8 +94,7 @@ class Session(object):
 
         plugin_paths = plugin_paths or os.environ.get('PIX_PLUGIN_PATH')
         if plugin_paths:
-            _import_modules(plugin_paths)
-
+            pix.utils.import_modules(plugin_paths)
         self.factory = pix.factory.Factory(self)
 
         self._projects = None
@@ -160,7 +120,7 @@ class Session(object):
         --------
         >>> with Session() as session:
         ...     project = session.load_project('FooBar')
-        ...     print project.label
+        ...     label = project.label
         """
         return self
 
