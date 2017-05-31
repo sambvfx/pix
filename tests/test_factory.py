@@ -1,21 +1,10 @@
-"""
-`pix.factory.Factory` testing module
-"""
-from pytest import fixture
 from mock import patch
-import pix.model
+from pytest import fixture
+
 import pix.factory
+import pix.model
 
-
-@pix.factory.register('PIXTestObj')
-class PIXTestObj(pix.model.PIXObject):
-    def get_one(self):
-        return 1
-
-
-@pix.factory.register('PIXTestChildObj')
-class PIXTestChildObj(pix.model.PIXObject):
-    pass
+from tests.mymodels import PIXTestObj, PIXTestChildObj
 
 
 @fixture()
