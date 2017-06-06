@@ -129,7 +129,7 @@ class PIXContainer(PIXObject):
 class _ActiveProject(type):
     """
     Metaclass that wraps all instance methods to first ensure that the project 
-    is current active project in the session. 
+    is the active project in the session.
     
     The use of a metaclass has advantages of also affecting instance methods 
     on sub-classes of `PIXProject`.
@@ -313,70 +313,26 @@ class PIXNote(PIXObject):
         Parameters
         ----------
         media_type : str
-        """
-        with self.session.header({'Accept': 'text/xml'}):
-            url = '/media/{0}/{1}'.format(self['id'], media_type)
-            response = self.session.get(url)
-        if response.status_code == 200:
-            return response.text
-        raise pix.exc.PIXError(response.reason)
+            {'original', 'markup', 'composite'}
+            '
 
-    def _get_original(self):
+        Returns
+        -------
+        bytes
         """
-        Get the original media from a note.
-        """
-        frame = self.fields['start_frame']
-        if frame is not None:
-            with self.session.header({'Accept': 'image/png'}):
-                url = '/media/{0}/frame/{1}'.format(
-                    self.fields['parent_id'], frame)
-                response = self.session.get(url)
-            return response.content
+        # special original behavior if there is a start_frame
+        if media_type == 'original' and self.fields['start_frame'] is not None:
+            headers = {'Accept': 'image/png'}
+            url = '/media/{0}/frame/{1}'.format(
+                self.fields['parent_id'], self.fields['start_frame'])
         else:
-            return self.get_media('original')
+            headers = {'Accept': 'text/xml'}
+            url = '/media/{0}/{1}'.format(self['id'], media_type)
 
-    def get_original(self):
-        """
-        Get the notes original media as an Image buffer.
+        with self.session.header(headers):
+            response = self.session.get(url)
 
-        Returns
-        -------
-        Optional[PIL.Image]
-        """
-        results = self._get_original()
-        if results:
-            import io
-            from PIL import Image
-            return Image.open(io.BytesIO(results))
+        if response.status_code == 200:
+            return response.content
 
-    def get_markup(self):
-        """
-        Get the notes markup as an Image buffer.
-
-        Returns
-        -------
-        Optional[PIL.Image]
-        """
-        results = self.get_media('markup')
-        if results:
-            import io
-            import cairosvg.surface
-            from PIL import Image
-            return Image.open(io.BytesIO(
-                cairosvg.surface.PNGSurface.convert(bytestring=results)))
-
-    def get_composite(self):
-        """
-        Get a composite Image buffer of the original image and the markup.
-
-        Returns
-        -------
-        Optional[PIL.Image]
-        """
-        # FIXME: There should be a endpoint that returns this already
-        # composited together.
-        bg = self.get_original()
-        fg = self.get_markup()
-        if bg and fg:
-            bg.paste(fg, (0, 0), fg)
-            return bg
+        raise pix.exc.PIXError(response.reason)
