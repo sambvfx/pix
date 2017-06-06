@@ -59,6 +59,7 @@ import pix.api
 with pix.api.Session() as session:
     project = session.get_project('PROJECT_NAME')
     for feed in project.iter_unread():
-        for note in feed.get_notes():
-            note.ingest()
+        for attachment in feed.iter_attachments():
+            for note in attachment.get_notes():
+                note.ingest()
 ```
