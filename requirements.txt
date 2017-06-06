@@ -1,5 +1,3 @@
 six
 typing
 requests
-Pillow
-CairoSVG==1.0.22
