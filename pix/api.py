@@ -31,7 +31,7 @@ class SessionHeader(object):
         Parameters
         ----------
         session : Session
-        headers : dict
+        headers : Dict[str, str]
         """
         super(SessionHeader, self).__init__()
         self._session = session
@@ -140,8 +140,8 @@ class Session(object):
         password : str
             The PIX password associated with `username` used for logging in.
         """
-        payload = json.dumps({'username': username, 'password': password})
-        result = self.session(app_key, payload)
+        result = self.session(
+            app_key, json.dumps({'username': username, 'password': password}))
         assert result.status_code == 201, 'Error logging into PIX.'
         self._session = result
 
@@ -158,8 +158,8 @@ class Session(object):
         """
         self.headers['X-PIX-App-Key'] = app_key
         logger.info(self.baseURL + '/session')
-        result = requests.put(url=self.baseURL + '/session/',
-                              headers=self.headers, data=payload)
+        result = requests.put(
+            url=self.baseURL + '/session/', headers=self.headers, data=payload)
         self.cookies = result.cookies
         return result
 
@@ -167,17 +167,15 @@ class Session(object):
         """
         Get the time remaining for current session.
         """
-        url = '/session/time_remaining'
-        result = self.get(url)
-        return result
+        return self.get('/session/time_remaining')
 
     def delete_session(self):
         """
         End a PIX session.
         """
-        result = requests.delete(url=self.baseURL + '/session/',
-                                 cookies=self.cookies, headers=self.headers)
-        return result
+        return requests.delete(
+            url=self.baseURL + '/session/', cookies=self.cookies,
+            headers=self.headers)
 
     def put(self, url, payload=None):
         """
@@ -185,8 +183,8 @@ class Session(object):
         """
         if self.baseURL not in url:
             url = self.baseURL + url
-        return requests.put(url=url, cookies=self.cookies,
-                            headers=self.headers, data=payload)
+        return requests.put(
+            url=url, cookies=self.cookies, headers=self.headers, data=payload)
 
     def post(self, url, payload=None):
         """
@@ -194,8 +192,8 @@ class Session(object):
         """
         if self.baseURL not in url:
             url = self.baseURL + url
-        return requests.post(url=url, cookies=self.cookies,
-                             headers=self.headers, data=payload)
+        return requests.post(
+            url=url, cookies=self.cookies, headers=self.headers, data=payload)
 
     def delete(self, url, payload=None):
         """
@@ -203,8 +201,8 @@ class Session(object):
         """
         if self.baseURL not in url:
             url = self.baseURL + url
-        return requests.delete(url=url, cookies=self.cookies,
-                               headers=self.headers, data=payload)
+        return requests.delete(
+            url=url, cookies=self.cookies, headers=self.headers, data=payload)
 
     def get(self, url):
         """
@@ -310,10 +308,8 @@ class Session(object):
         """
         if isinstance(project, six.string_types):
             project = self.project_names[project]
-        request_dict = {'id': project.id}
-        url = '/session/active_project'
-        payload = json.dumps(request_dict)
-        result = self.put(url, payload)
+        result = self.put(
+            '/session/active_project', json.dumps({'id': project.id}))
         if result.status_code == 200:
             self.active_project = project
             return project

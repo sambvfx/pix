@@ -152,4 +152,5 @@ class Factory(object):
             return data
 
 
+# to make registration easier...
 register = Factory.register

@@ -104,11 +104,9 @@ class PIXContainer(PIXObject):
     """
     def get_contents(self):
         """
-        Getes the contents of a folder or playlist.
+        Gets the contents of a folder or playlist.
         """
-        url = '/items/{0}/contents'.format(self.id)
-        result = self.session.get(url)
-        return result
+        return self.session.get('/items/{0}/contents'.format(self.id))
 
     def children(self):
         """
@@ -178,8 +176,7 @@ class PIXProject(PIXObject):
         """
         Loads an item from PIX.
         """
-        url = '/items/{0}'.format(item_id)
-        return self.session.get(url)
+        return self.session.get('/items/{0}'.format(item_id))
 
     def get_inbox(self, limit=None):
         """
@@ -214,9 +211,9 @@ class PIXProject(PIXObject):
         ----------
         item : PIXObject
         """
-        url = '/items/{0}'.format(item['id'])
-        payload = json.dumps({'flags': {'viewed': 'true'}})
-        return self.session.put(url, payload)
+        return self.session.put(
+            '/items/{0}'.format(item['id']),
+            json.dumps({'flags': {'viewed': 'true'}}))
 
     def delete_inbox_item(self, item):
         """
@@ -226,8 +223,7 @@ class PIXProject(PIXObject):
         ----------
         item : PIXObject
         """
-        url = '/messages/inbox/{0}'.format(item['id'])
-        return self.session.delete(url)
+        return self.session.delete('/messages/inbox/{0}'.format(item['id']))
 
 
 @register('PIXShareFeedEntry')
@@ -239,9 +235,9 @@ class PIXShareFeedEntry(PIXObject):
         """
         Mark's an item in logged-in user's inbox as read.
         """
-        url = '/items/{0}'.format(self['id'])
-        payload = json.dumps({'flags': {'viewed': 'true'}})
-        return self.session.put(url, payload)
+        return self.session.put(
+            '/items/{0}'.format(self['id']),
+            json.dumps({'flags': {'viewed': 'true'}}))
 
     def iter_attachments(self):
         """
@@ -266,6 +262,7 @@ class PIXShareFeedEntry(PIXObject):
         -------
         PIXObject
         """
+        # FIXME: any way to optimize this?
         for x in self.iter_attachments():
             identifier = x.get('label') or x['id']
             if identifier == name:
