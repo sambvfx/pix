@@ -3,7 +3,5 @@
 venv/
 venv3/
 bin/
-local/
-pix.egg-info/
 .DS_Store
 *.pyc

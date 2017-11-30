@@ -7,13 +7,13 @@ import six
 import pix.exc
 from pix.factory import register
 
-from typing import TYPE_CHECKING, Iterator, Optional, Dict
 
-
-if TYPE_CHECKING:
+if False:
+    from typing import *
     import pix.factory
 
 
+# TODO: Use MutableMapping instead?
 class PIXObject(dict):
     """
     The base PIX object.
@@ -76,6 +76,9 @@ class PIXObject(dict):
 
         return dir2(self) + self.keys()
 
+    # TODO: Ditch this behavior. (Backwards incompatible change!)
+    # It's probably that at some point a user is going create a method named
+    # the same as a key fetched from PIX.
     def __getattr__(self, item):
         # This makes either `self['attribute']` or `self.attribute` work.
         return self[item]
@@ -121,7 +124,7 @@ class PIXContainer(PIXObject):
         for data in self.get_contents():
             for child in self.factory.iter_children(data, recursive=True):
                 results.append(child)
-            return results
+        return results
 
 
 class _ActiveProject(type):
@@ -311,7 +314,6 @@ class PIXNote(PIXObject):
         ----------
         media_type : str
             {'original', 'markup', 'composite'}
-            '
 
         Returns
         -------

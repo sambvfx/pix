@@ -12,10 +12,9 @@ import pix.utils
 
 import logging
 
-from typing import TYPE_CHECKING, Optional, Union, List, Dict, Any
 
-
-if TYPE_CHECKING:
+if False:
+    from typing import *
     import pix.model
 
 

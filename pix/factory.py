@@ -1,10 +1,8 @@
 """
 PIX class factory module.
 """
-from typing import TYPE_CHECKING, Type, Iterator, Dict
-
-
-if TYPE_CHECKING:
+if False:
+    from typing import *
     import pix.api
     import pix.model
 
