@@ -31,7 +31,7 @@ setup(
     name='pix',
     version=version(),
     description=__doc__,
-    long_description=read('README.rst'),
+    long_description=read('README.md'),
     author='Sam Bourne',
     packages=['pix'],
     extras_require={'tests': ['pytest', 'mock']}
