@@ -1,12 +1,21 @@
 """
 Utilities
 """
-import os
 import sys
+import os
 import six
+import uuid
+
+import pix.exc
+
+from typing import *
+
+
+ModuleType = type(sys)
 
 
 def iter_modules(paths):
+    # type: (Union[str, Iterable[str]]) -> List[str]
     """
     Get filepaths for all valid python modules from `paths`.
     
@@ -14,10 +23,10 @@ def iter_modules(paths):
     ----------
     paths : Union[str, Iterable[str]]
         Supports various path separation methods: e.g.
-            '/project/package/mymodule.py'
-            '/project/package'
-            '/project/package:project/package/mymodule.py'
-            ['/project/package']
+           - '/project/package/mymodule.py'
+           - '/project/package'
+           - '/project/package:project/package/mymodule.py'
+           - ['/project/package']
 
     Returns
     -------
@@ -37,18 +46,25 @@ def iter_modules(paths):
 
         obj = pydoc.locate(path)
         if obj:
-            yield obj.__file__
+            if obj.__file__.endswith('pyc'):
+                yield obj.__file__[:-1]
+            else:
+                yield obj.__file__
         else:
-            path = os.path.abspath(path)
             if os.path.isfile(path) and path.endswith('py'):
                 yield path
-            for base, directories, filenames in os.walk(path):
-                for filename in filenames:
-                    if filename.endswith('py'):
-                        yield os.path.join(base, filename)
+            elif os.path.isdir(path):
+                for base, directories, filenames in os.walk(path):
+                    for filename in filenames:
+                        if filename.endswith('py'):
+                            yield os.path.join(base, filename)
+            else:
+                raise pix.exc.PIXPluginPathError(
+                    'Cannot locate plugin path {!r}'.format(path))
 
 
 def import_modules(paths):
+    # type: (Union[str, Iterable[str]]) -> List[ModuleType]
     """
     Import modules from `paths`.
 
@@ -58,33 +74,32 @@ def import_modules(paths):
 
     Returns
     -------
-    List[module]
+    List[ModuleType]
     """
-    import imp
-    import uuid
 
-    modules = set(iter_modules(paths))
+    def _py2_import(name, path):
+        # import modules for python 2
+        import imp
+        return imp.load_source(name, path)
 
-    results = []
-    for mod in modules:
-        results.append(imp.load_source(uuid.uuid4().hex, mod))
-    return results
+    def _py33_to_34_import(name, path):
+        # import modules for python 3.3 and 3.4
+        from importlib.machinery import SourceFileLoader
+        return SourceFileLoader(name, path).load_module()
 
+    def _py35plus_import(name, path):
+        # import modules for python 3.5+
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(name, path)
+        foo = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(foo)
+        return foo
 
-class ExpandedPath(object):
-    """
-    Context manager for temporarily expanding the python path.
-    """
-    def __init__(self, paths=None):
-        self.paths = paths
-        self.orig_paths = None
+    if sys.version_info[0] == 3 and sys.version_info[1] in (3, 4):
+        loader = _py33_to_34_import
+    elif sys.version_info[0] == 3 and sys.version_info[1] >= 5:
+        loader = _py35plus_import
+    else:
+        loader = _py2_import
 
-    def __enter__(self):
-        if self.paths:
-            self.orig_paths = sys.path
-            sys.path.extend(self.paths)
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.orig_paths is not None:
-            sys.path = self.orig_paths
+    return [loader(uuid.uuid4().hex, mod) for mod in set(iter_modules(paths))]

@@ -1,5 +1,8 @@
-from mock import patch
-from pytest import fixture
+"""
+Tests for the pix factory.
+"""
+import pytest
+import mock
 
 import pix.factory
 import pix.model
@@ -7,13 +10,13 @@ import pix.model
 from tests.mymodels import PIXTestObj, PIXTestChildObj
 
 
-@fixture()
-@patch('pix.api.Session')
+@pytest.fixture()
+@mock.patch('pix.api.Session')
 def factory(session):
     return pix.factory.Factory(session)
 
 
-@fixture()
+@pytest.fixture()
 def payload():
     return {
         'class': 'PIXTestObj',
@@ -36,19 +39,19 @@ def test_register(factory):
     assert PIXTestChildObj in factory._registered['PIXTestChildObj']
 
 
-def test_build_obj(factory):
-    cls = factory.build_obj('PIXTestObj')
+def test_build(factory):
+    cls = factory.build('PIXTestObj')
     assert issubclass(cls, PIXTestObj)
-    cls = factory.build_obj('PIXTestChildObj')
+    cls = factory.build('PIXTestChildObj')
     assert issubclass(cls, PIXTestChildObj)
 
 
 def test_objectfy(factory, payload):
     obj = factory.objectfy(payload)
-    assert obj.name == 'parent'
     assert obj['name'] == 'parent'
-    assert len(obj.tests) == 2
-    for child in obj.tests:
+    assert hasattr(obj, 'get_one')
+    assert len(obj['tests']) == 2
+    for child in obj['tests']:
         assert isinstance(child, PIXTestChildObj)
 
 

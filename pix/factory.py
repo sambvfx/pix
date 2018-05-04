@@ -1,10 +1,15 @@
 """
 PIX class factory module.
 """
-if False:
-    from typing import *
+from typing import *
+
+
+if TYPE_CHECKING:
     import pix.api
     import pix.model
+
+
+T = TypeVar('T')
 
 
 class Factory(object):
@@ -17,15 +22,16 @@ class Factory(object):
     structures returned from PIX.
 
     A base class for a given PIX class can be registered via the `register`
-    method given the PIX class name. Any structure (dict) returned from a PIX
-    request that contains a key 'class' is premoted to an object using any
-    registered base classes (or ``pix.model.PIXObject`` if there are none
-    registered).
+    method given the PIX class name. Any structure returned from a PIX request
+    that contains dictionaries with a key 'class' is premoted to an object
+    using any registered base classes (or ``pix.model.PIXObject`` if there are
+    none registered).
     """
     # registered bases
-    _registered = {}
+    _registered = {}  # type: Dict[str, pix.model.PIXObject]
 
     def __init__(self, session):
+        # type: (pix.api.Session) -> None
         """
         Parameters
         ----------
@@ -35,6 +41,7 @@ class Factory(object):
 
     @classmethod
     def register(cls, name):
+        # type: (str) -> Callable
         """
         Decorator for registering an new PIX base class.
 
@@ -42,6 +49,10 @@ class Factory(object):
         ----------
         name : str
             PIX class name. e.g. 'PIXImage'
+
+        Returns
+        -------
+        Callable
         """
         def _deco(klass):
             bases = cls._registered.get(name, [])
@@ -52,7 +63,8 @@ class Factory(object):
         return _deco
 
     @classmethod
-    def build_obj(cls, name):
+    def build(cls, name):
+        # type: (str) -> type
         """
         Build a pix object class with the given name. Any registered bases
         keyed for `name` will be used or the base ``pix.model.PIXObject``
@@ -65,8 +77,10 @@ class Factory(object):
 
         Returns
         -------
-        Type[pix.model.PIXObject]
+        type
+            Type[pix.model.PIXObject]
         """
+        # this import here avoids circular import errors
         import pix.model
         # look for registered base classes and if none use the base object
         bases = cls._registered.get(str(name), [pix.model.PIXObject])
@@ -76,17 +90,18 @@ class Factory(object):
 
     @classmethod
     def iter_contents(cls, data):
+        # type: (Dict) -> Iterator[Dict]
         """
         Iter the immediate contents of `data` and yield any dictionaries.
         Does not recurse.
 
         Parameters
         ----------
-        data : dict
+        data : Dict
 
         Returns
         -------
-        Iterator[dict]
+        Iterator[Dict]
         """
         for k, v in data.items():
             if isinstance(v, dict):
@@ -97,12 +112,13 @@ class Factory(object):
                         yield l
 
     def iter_children(self, data, recursive=True):
+        # type: (Dict, bool) -> Iterator[pix.model.PIXObject]
         """
         Iterate over the children objects of `data`.
 
         Parameters
         ----------
-        data : dict
+        data : Dict
         recursive : bool
             Recursively look into generated objects and include their children
             too.
@@ -113,7 +129,7 @@ class Factory(object):
         """
         name = data.get('class')
         if name:
-            obj = self.build_obj(name)
+            obj = self.build(name)
             yield obj(self, data)
         if recursive:
             for x in self.iter_contents(data):
@@ -121,21 +137,22 @@ class Factory(object):
                     yield obj
 
     def objectfy(self, data):
+        # type: (Union[Dict, T]) -> Union[pix.model.PIXObject, Dict, T]
         """
         Replace any viable structures with `pix.model.PIXObject`.
-        
+
         Parameters
         ----------
-        data : Union[Dict[str, Any], Any]
-        
+        data : Union[Dict, T]
+
         Returns
         -------
-        Union[pix.model.PIXObject, Dict[str, Any], Any]
+        Union[pix.model.PIXObject, Dict, T]
         """
         if isinstance(data, dict):
             name = data.get('class')
             if name:
-                obj = self.build_obj(name)
+                obj = self.build(name)
                 return obj(self, data)
             else:
                 return {k: self.objectfy(v) for k, v in data.items()}
@@ -150,5 +167,6 @@ class Factory(object):
             return data
 
 
-# to make registration easier...
+# expose to make registration easier
+# from pix.factory import register
 register = Factory.register
