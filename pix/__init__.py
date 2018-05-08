@@ -1,12 +1,23 @@
 """
 PIX python API.
 """
-__version__ = '0.4.0'
+from __future__ import absolute_import
+
+from .api import Session
+from .factory import register
+from .model import PIXObject, PIXProject
+
+
+__version__ = '0.4.1'
 __author__ = 'Sam Bourne'
 __contact__ = 'sambvfx@gmail.com'
+__license__ = 'MIT'
+__copyright__ = 'Copyright (c) 2018 Sam Bourne'
 
 
-# public api
-from pix.api import Session
-from pix.factory import register
-from pix.model import PIXObject, PIXProject
+__all__ = [
+    'Session',
+    'register',
+    'PIXObject',
+    'PIXProject',
+]

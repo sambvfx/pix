@@ -6,7 +6,7 @@ import os
 import six
 import uuid
 
-import pix.exc
+from .exc import PIXError
 
 from typing import *
 
@@ -59,7 +59,7 @@ def iter_modules(paths):
                         if filename.endswith('py'):
                             yield os.path.join(base, filename)
             else:
-                raise pix.exc.PIXPluginPathError(
+                raise PIXError(
                     'Cannot locate plugin path {!r}'.format(path))
 
 

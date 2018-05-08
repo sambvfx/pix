@@ -10,15 +10,8 @@ class PIXError(Exception):
     pass
 
 
-class PIXInvalidProjectError(PIXError):
+class PIXLoginError(PIXError):
     """
-    Error raised when a requested project does not exist.
-    """
-    pass
-
-
-class PIXPluginPathError(PIXError):
-    """
-    Error raised when a specified plugin path cannot be loaded.
+    Error raised when there are issues logging into PIX.
     """
     pass

@@ -5,8 +5,8 @@ from typing import *
 
 
 if TYPE_CHECKING:
-    import pix.api
-    import pix.model
+    from .api import Session
+    from .model import PIXObject
 
 
 T = TypeVar('T')
@@ -28,14 +28,14 @@ class Factory(object):
     none registered).
     """
     # registered bases
-    _registered = {}  # type: Dict[str, pix.model.PIXObject]
+    _registered = {}  # type: Dict[str, PIXObject]
 
     def __init__(self, session):
-        # type: (pix.api.Session) -> None
+        # type: (Session) -> None
         """
         Parameters
         ----------
-        session : pix.api.Session
+        session : Session
         """
         self.session = session
 
@@ -78,54 +78,54 @@ class Factory(object):
         Returns
         -------
         type
-            Type[pix.model.PIXObject]
+            Type[PIXObject]
         """
-        # this import here avoids circular import errors
-        import pix.model
+        # import here avoids circular import errors
+        from .model import PIXObject
         # look for registered base classes and if none use the base object
-        bases = cls._registered.get(str(name), [pix.model.PIXObject])
+        bases = cls._registered.get(str(name), [PIXObject])
         obj = type(str(name), tuple(bases), {})
         obj.__name__ = str(name)
         return obj
 
     @classmethod
     def iter_contents(cls, data):
-        # type: (Dict) -> Iterator[Dict]
+        # type: (Mapping) -> Generator[Mapping]
         """
         Iter the immediate contents of `data` and yield any dictionaries.
         Does not recurse.
 
         Parameters
         ----------
-        data : Dict
+        data : Mapping
 
         Returns
         -------
-        Iterator[Dict]
+        Generator[Mapping]
         """
         for k, v in data.items():
-            if isinstance(v, dict):
+            if isinstance(v, Mapping):
                 yield v
-            elif isinstance(v, (set, list, tuple)):
+            elif isinstance(v, (list, tuple, set)):
                 for l in v:
-                    if isinstance(l, dict):
+                    if isinstance(l, Mapping):
                         yield l
 
     def iter_children(self, data, recursive=True):
-        # type: (Dict, bool) -> Iterator[pix.model.PIXObject]
+        # type: (Mapping, bool) -> Generator[PIXObject]
         """
         Iterate over the children objects of `data`.
 
         Parameters
         ----------
-        data : Dict
+        data : Mapping
         recursive : bool
             Recursively look into generated objects and include their children
             too.
 
         Returns
         -------
-        Iterator[pix.model.PIXObject]
+        Generator[PIXObject]
         """
         name = data.get('class')
         if name:
@@ -137,36 +137,31 @@ class Factory(object):
                     yield obj
 
     def objectfy(self, data):
-        # type: (Union[Dict, T]) -> Union[pix.model.PIXObject, Dict, T]
+        # type: (T) -> Union[PIXObject, T]
         """
-        Replace any viable structures with `pix.model.PIXObject`.
+        Replace any viable structures with `PIXObject`.
 
         Parameters
         ----------
-        data : Union[Dict, T]
+        data : T
 
         Returns
         -------
-        Union[pix.model.PIXObject, Dict, T]
+        Union[PIXObject, T]
         """
-        if isinstance(data, dict):
+        if isinstance(data, MutableMapping):
             name = data.get('class')
             if name:
                 obj = self.build(name)
                 return obj(self, data)
             else:
-                return {k: self.objectfy(v) for k, v in data.items()}
-        elif isinstance(data, (tuple, list, set)):
-            results = [self.objectfy(x) for x in data]
-            if isinstance(data, tuple):
-                results = tuple(results)
-            elif isinstance(data, set):
-                results = set(results)
-            return results
+                return data.__class__(
+                    {k: self.objectfy(v) for k, v in data.items()})
+        elif isinstance(data, (list, tuple, set)):
+            return data.__class__(self.objectfy(x) for x in data)
         else:
             return data
 
 
 # expose to make registration easier
-# from pix.factory import register
 register = Factory.register

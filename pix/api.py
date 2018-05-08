@@ -1,25 +1,24 @@
 """
 Main PIX API module.
 """
+from __future__ import absolute_import
+
 import os
 import requests
 import json
 import six
-
-import pix.factory
-import pix.exc
-import pix.utils
-
-import logging
+import time
 
 from typing import *
 
+from .factory import Factory
+from .model import PIXProject
+from .exc import PIXLoginError, PIXError
+from .utils import import_modules
+
 
 if TYPE_CHECKING:
-    import pix.model
-
-
-logger = logging.getLogger(__name__)
+    import requests.cookies
 
 
 class SessionHeader(object):
@@ -48,12 +47,48 @@ class SessionHeader(object):
         self._session.headers = self.original
 
 
+class Expiry(object):
+    """
+    Object that existence check fails for after a set duration in seconds.
+
+    Examples
+    --------
+    >>> import time
+    >>> e = Expiry(5)
+    >>> i = 0
+    >>> while True:
+    ...     if not e:
+    ...         break
+    ...     print(i)
+    ...     i += 1
+    ...     time.sleep(1)
+    """
+    def __init__(self, seconds):
+        # type: (Union[int, float]) -> None
+        """
+        Parameters
+        ----------
+        seconds : Union[int, float]
+        """
+        self.expires = time.time() + seconds
+
+    def __nonzero__(self):
+        # type: () -> bool
+        """
+        Returns
+        -------
+        bool
+        """
+        return time.time() < self.expires
+
+
 class Session(object):
     """
     A Session manages all API calls to the PIX REST endpoints. It manages
     the current PIX session including the user logging in and the current
     active project. PIX REST calls return results differently depending on
-    the active user and project.
+    the active user and project. It also handles refreshing the active session
+    if it expires
 
     Examples
     --------
@@ -64,6 +99,7 @@ class Session(object):
     ...             for note in attachment.get_notes():
     ...                 image_bytes = note.get_media('composite')
     """
+
     def __init__(self, api_url=None, app_key=None, username=None, password=None,
                  plugin_paths=None):
         # type: (Optional[str], Optional[str], Optional[str], Optional[str], Optional[List[str]]) -> None
@@ -88,34 +124,37 @@ class Session(object):
             registration of any custom bases within the factory. If None, 
             the environment variable PIX_PLUGIN_PATH will be used.
         """
-        api_url = api_url or os.environ.get('PIX_API_URL')
-        password = password or os.environ.get('PIX_PASSWORD')
-        app_key = app_key or os.environ.get('PIX_APP_KEY')
-        username = username or os.environ.get('PIX_USERNAME')
+        self.api_url = api_url or os.environ.get('PIX_API_URL')
+        self.app_key = app_key or os.environ.get('PIX_APP_KEY')
+        self.username = username or os.environ.get('PIX_USERNAME')
+        self.password = password or os.environ.get('PIX_PASSWORD')
 
-        # e.g. 'https://project.pixsystem.com/developer/api/2'
-        self.api_url = api_url  # type: str
+        _creds = [x for x in ('api_url', 'app_key', 'username', 'password')
+                  if getattr(self, x) is None]
+        if _creds:
+            raise PIXLoginError('Missing login credentials: {}'.format(
+                ', '.join(_creds)))
 
         plugin_paths = plugin_paths or os.environ.get('PIX_PLUGIN_PATH')
         if plugin_paths:
-            pix.utils.import_modules(plugin_paths)
+            import_modules(plugin_paths)
 
-        self.factory = pix.factory.Factory(self)
-
-        self._projects = None  # type: List[pix.model.PIXProject]
-        self.active_project = None  # type: pix.model.PIXProject
-
-        self._session = None  # type: requests.Response
+        self.factory = Factory(self)
 
         self.headers = {
-            'X-PIX-App-Key': None,
+            'X-PIX-App-Key': self.app_key,
             'Content-type': 'application/json;charset=utf-8',
             'Accept': 'application/json;charset=utf-8'
         }
 
-        self.cookies = None
+        self.cookies = None  # type: requests.cookies.RequestsCookieJar
 
-        self.login(app_key=app_key, username=username, password=password)
+        # A time-out object representing the current session. Expires after a
+        # set duration and is then refreshed.
+        self._session = None  # type: Expiry
+
+        # current active project
+        self.active_project = None  # type: PIXProject
 
     def __enter__(self):
         # type: () -> Session
@@ -137,26 +176,21 @@ class Session(object):
     def __exit__(self, *args):
         self.logout()
 
-    def login(self, app_key, username, password):
-        # type: (str, str, str) -> None
+    def login(self):
         """
         Log into PIX
-
-        Parameters
-        ----------
-        app_key : str
-            The host PIX API KEY.
-        username : str
-            The PIX username used for logging in.
-        password : str
-            The PIX password associated with `username` used for logging in.
         """
-        result = self.session(
-            app_key, payload={'username': username, 'password': password})
+        result = requests.put(
+            url=self.api_url + '/session/',
+            headers=self.headers,
+            data=json.dumps(
+                {'username': self.username, 'password': self.password}))
 
-        assert result.status_code == 201, 'Error logging into PIX.'
+        if result.status_code != 201:
+            raise PIXLoginError(result.reason)
 
-        self._session = result
+        self.cookies = result.cookies
+        self._session = Expiry(self.time_remaining())
 
     def logout(self):
         """
@@ -165,44 +199,22 @@ class Session(object):
         result = self.delete_session()
         self._session = result
 
-    def session(self, app_key, payload=None):
-        # type: (str, Optional[Dict]) -> requests.Response
-        """
-        Get a PIX session
-
-        Parameters
-        ----------
-        app_key : str
-        payload : Optional[Dict]
-
-        Returns
-        -------
-        requests.Response
-        """
-        self.headers['X-PIX-App-Key'] = app_key
-
-        logger.info(self.api_url + '/session')
-
-        if payload is not None:
-            payload = json.dumps(payload)
-
-        result = requests.put(
-            url=self.api_url + '/session/', headers=self.headers, data=payload)
-
-        self.cookies = result.cookies
-
-        return result
-
     def time_remaining(self):
-        # type: () -> requests.Response
+        # type: () -> int
         """
         Get the time remaining for current session.
 
         Returns
         -------
-        requests.Response
+        int
         """
-        return self.get('/session/time_remaining')
+        # Not using self.get here is intentional to avoid recursive self.login
+        # calls.
+        response = requests.get(
+            url=self.api_url + '/session/time_remaining',
+            cookies=self.cookies,
+            headers=self.headers)
+        return json.loads(response.text)
 
     def delete_session(self):
         # type: () -> requests.Response
@@ -231,6 +243,9 @@ class Session(object):
         -------
         requests.Response
         """
+        if not self._session:
+            self.login()
+
         if self.api_url not in url:
             url = self.api_url + url
 
@@ -254,6 +269,9 @@ class Session(object):
         -------
         requests.Response
         """
+        if not self._session:
+            self.login()
+
         if self.api_url not in url:
             url = self.api_url + url
 
@@ -277,6 +295,9 @@ class Session(object):
         -------
         requests.Response
         """
+        if not self._session:
+            self.login()
+
         if self.api_url not in url:
             url = self.api_url + url
 
@@ -287,7 +308,7 @@ class Session(object):
             url=url, cookies=self.cookies, headers=self.headers, data=payload)
 
     def get(self, url):
-        # type: (str) -> Union[requests.Response, pix.model.PIXObject, Dict, List]
+        # type: (str) -> Union[requests.Response, Any]
         """
         GET REST call
 
@@ -297,20 +318,24 @@ class Session(object):
 
         Returns
         -------
-        Union[requests.Response, pix.model.PIXObject, Dict, List]
+        Union[requests.Response, Any]
         """
+        if not self._session:
+            self.login()
+
         if self.api_url not in url:
             url = self.api_url + url
+
         return self.process_result(
             requests.get(url=url, cookies=self.cookies, headers=self.headers))
 
     def process_result(self, raw_result):
-        # type: (requests.Response) -> Union[requests.Response, pix.model.PIXObject, Dict[str, Any], Any]
+        # type: (requests.Response) -> Union[requests.Response, Any]
         """
-        Process request results. This utilizes the `pix.factory.Factory`
-        to premote certain elements within the raw results to dict-like
-        objects. These objects may be built with base classes registered with
-        the factory to offer additional helper methods.
+        Process request results. This utilizes the `Factory` to premote
+        certain elements within the raw results to dict-like objects. These
+        objects may be built with base classes registered with the factory to
+        offer additional helper methods.
 
         Parameters
         ----------
@@ -318,7 +343,7 @@ class Session(object):
         
         Returns
         -------
-        Union[requests.Response, pix.model.PIXObject, Dict[str, Any], Any]
+        Union[requests.Response, Any]
         """
         if self.headers['Accept'] != 'application/json;charset=utf-8':
             return raw_result
@@ -346,7 +371,7 @@ class Session(object):
         return SessionHeader(self, headers)
 
     def get_projects(self, limit=None):
-        # type: (Optional[int]) -> List[pix.model.PIXProject]
+        # type: (Optional[int]) -> List[PIXProject]
         """
         Load all projects user has access to.
 
@@ -356,45 +381,37 @@ class Session(object):
 
         Returns
         -------
-        List[pix.model.PIXProject]
+        List[PIXProject]
         """
-        if self._session is None:
-            raise pix.exc.PIXError(
-                'You must login before you can fetch projects.')
+        url = '/projects'
 
-        if self._projects is None:
+        if limit is not None:
+            url += '?limit={}'.format(limit)
 
-            url = '/projects'
+        response = self.get(url)
 
-            if limit is not None:
-                url += '?limit={}'.format(limit)
+        if isinstance(response, dict):
+            if response.get('type') == 'bad_request':
+                raise PIXError(
+                    'Error fetching projects: {0}'.format(
+                        response.get('user_message')))
 
-            response = self.get(url)
+        response = cast(List[PIXProject], response)
 
-            if isinstance(response, dict):
-                if response.get('type') == 'bad_request':
-                    raise pix.exc.PIXError(
-                        'Error fetching projects: {0}'.format(
-                            response.get('user_message')))
-
-            response = cast(List[pix.model.PIXProject], response)
-
-            self._projects = response
-
-        return self._projects
+        return response
 
     def load_project(self, project):
-        # type: (Union[str, pix.model.PIXProject]) -> pix.model.PIXProject
+        # type: (Union[str, PIXProject]) -> PIXProject
         """
         Load a project as the active project.
 
         Parameters
         ----------
-        project : Union[str, pix.model.PIXProject]
+        project : Union[str, PIXProject]
 
         Returns
         -------
-        pix.model.PIXProject
+        PIXProject
         """
         if isinstance(project, six.string_types):
             for p in self.get_projects():
@@ -402,7 +419,7 @@ class Session(object):
                     project = p
                     break
             else:
-                raise pix.exc.PIXInvalidProjectError(
+                raise PIXError(
                     'No project found {!r}'.format(project))
 
         result = self.put(
@@ -412,4 +429,4 @@ class Session(object):
             self.active_project = project
             return project
 
-        raise pix.exc.PIXError(result.reason)
+        raise PIXError(result.reason)

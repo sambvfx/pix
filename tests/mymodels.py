@@ -1,8 +1,7 @@
 """
 Mock module of test pix objects
 """
-from pix.factory import register
-from pix.model import PIXObject
+from pix import register, PIXObject
 
 
 @register('PIXTestObj')

@@ -3,6 +3,7 @@ import pix.api
 
 
 os.environ['PIX_API_URL'] = 'https://project.pixsystem.com/developer/api/2'
+os.environ['PIX_USERNAME'] = 'sambvfx'
 os.environ['PIX_PASSWORD'] = 'mypassword'
 os.environ['PIX_APP_KEY'] = '123abc'
 
@@ -17,6 +18,8 @@ class MockResponse:
 
 
 def _get(url, params=None, **kwargs):
+    if url.endswith('/session/time_remaining'):
+        return MockResponse(status_code=200, text='1800')
     return MockResponse(status_code=404)
 
 

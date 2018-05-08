@@ -45,13 +45,13 @@ $ export PIX_PASSWORD='mypassword'
 $ export PIX_PLUGIN_PATH='/path/to/mypixmodels.py:/path/to/other/package'
 ```
 
-Once we have a session, before we issue any API calls We then need to activate a project. Returned results will change depending on the active project.
+Once we have a session, before we issue any API calls a project needs to be activated. Returned results will change depending on the active project.
 
 ```python
 project = session.load_project('MyProject')
 ```
 
-From here we can issue some commands provided by our default [models](https://github.com/sambvfx/pix/blob/master/pix/model.py). For example getting all unread notes with attachments.
+From here we can issue some commands provided by our default [models](https://github.com/sambvfx/pix/blob/master/pix/model.py). For example getting all unread inbox messages.
 
 ```python
 from __future__ import print_function
@@ -62,12 +62,12 @@ session = pix.Session()
 
 project = session.load_project('MyProject')
 
+# print unread inbox messages
 for feed in project.get_inbox():
     if feed['viewed']:
         continue
-    for attachment in feed.get_attachments():
-        for note in attachment.get_notes():
-            print(note['message'])
+    print('{!r} -> {!r} : {!r}'.format(
+        feed.sender, feed.recipients, feed.message))
 
 session.logout()
 ```

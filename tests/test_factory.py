@@ -5,7 +5,6 @@ import pytest
 import mock
 
 import pix.factory
-import pix.model
 
 from tests.mymodels import PIXTestObj, PIXTestChildObj
 

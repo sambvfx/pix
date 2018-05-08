@@ -55,7 +55,7 @@ def test_invalid_plugin_paths(invalid_plugin_path):
     """
     Test invalid plugin paths error.
     """
-    with pytest.raises(pix.exc.PIXPluginPathError):
+    with pytest.raises(pix.exc.PIXError):
         pix.api.Session(plugin_paths=[invalid_plugin_path])
 
 

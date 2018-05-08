@@ -3,46 +3,52 @@ A collection of pre-built PIX object/models.
 """
 import functools
 import six
-
-import pix.exc
-from pix.factory import register
+import collections
 
 from typing import *
 
+from .factory import Factory
+from .exc import PIXError
 
-if TYPE_CHECKING:
-    import pix.factory
 
-
-class PIXObject(dict):
+class PIXObject(collections.MutableMapping):
     """
     The base PIX object.
-
-    This is simply a wrapper of a dictionary to provide additional helper
-    methods and reduce complexity of large data structures.
     """
-    # since we're inheriting from dict having __dict__ is redundant
-    __slots__ = ()
-
     def __init__(self, factory, *args, **kwargs):
-        # type: (pix.factory.Factory, *Any, **Any) -> None
+        # type: (Factory, *Any, **Any) -> None
         """
         Parameters
         ----------
-        factory : pix.factory.Factory
+        factory : Factory
             The factory used to generate this instance.
         args : *Any
         kwargs : **Any
         """
         self.factory = factory
         self.session = factory.session
-        super(PIXObject, self).__init__(
-            {k: self.factory.objectfy(v)
-             for k, v in dict(*args, **kwargs).items()})
+
+        self._store = {k: self.factory.objectfy(v)
+                       for k, v in dict(*args, **kwargs).items()}
 
     def __repr__(self):
         return '<{0}({1!r})>'.format(
             self.__class__.__name__, str(self.identifier))
+
+    def __getitem__(self, key):
+        return self._store[key]
+
+    def __iter__(self):
+        return iter(self._store)
+
+    def __len__(self):
+        return len(self._store)
+
+    def __delitem__(self, key):
+        del self._store[key]
+
+    def __setitem__(self, key, value):
+        self._store[key] = value
 
     @property
     def identifier(self):
@@ -55,13 +61,13 @@ class PIXObject(dict):
         return self.get('label') or self['id']
 
     def children(self):
-        # type: () -> List[pix.model.PIXObject]
+        # type: () -> List[PIXObject]
         """
         Find all children downstream of self.
 
         Returns
         -------
-        List[pix.model.PIXObject]
+        List[PIXObject]
         """
         results = []
         # iter contents first so we don't include ourselves
@@ -71,13 +77,14 @@ class PIXObject(dict):
         return results
 
 
-class _ActiveProject(type):
+class _ActiveProject(GenericMeta):
     """
     Metaclass that wraps all instance methods to first ensure that the project 
     is the active project in the session.
     
-    The use of a metaclass has advantages of also affecting instance methods 
-    on sub-classes of `PIXProject`.
+    The use of a metaclass (rather than a decorator for example) has
+    advantages of also affecting instance methods on sub-classes of
+    `PIXProject`.
     """
     @staticmethod
     def activate_project(func):
@@ -118,7 +125,7 @@ class _ActiveProject(type):
         return super(_ActiveProject, mcs).__new__(mcs, name, bases, newattrs)
 
 
-@register('PIXProject')
+@Factory.register('PIXProject')
 @six.add_metaclass(_ActiveProject)
 class PIXProject(PIXObject):
     """
@@ -185,8 +192,19 @@ class PIXProject(PIXObject):
         return self.session.delete('/messages/inbox/{0}'.format(item['id']))
 
 
-@register('PIXPlaylist')
-@register('PIXFolder')
+@Factory.register('PIXUser')
+class PIXUser(PIXObject):
+    """
+    Class representing a user.
+    """
+    @property
+    def name(self):
+        # type: () -> str
+        return self['label']
+
+
+@Factory.register('PIXPlaylist')
+@Factory.register('PIXFolder')
 class PIXContainer(PIXObject):
     """
     Container class requires an additional call to get its contents.
@@ -203,14 +221,14 @@ class PIXContainer(PIXObject):
         return self.session.get('/items/{0}/contents'.format(self['id']))
 
     def children(self):
-        # type: () -> List[pix.model.PIXObject]
+        # type: () -> List[PIXObject]
         """
         Find all children downstream of self. This requires additional
         calls to get the contents.
 
         Returns
         -------
-        List[pix.model.PIXObject]
+        List[PIXObject]
         """
         results = []
         for data in self.get_contents():
@@ -219,11 +237,30 @@ class PIXContainer(PIXObject):
         return results
 
 
-@register('PIXShareFeedEntry')
+@Factory.register('PIXShareFeedEntry')
 class PIXShareFeedEntry(PIXObject):
     """
-    Class representing a feed.
+    Class representing a feed. A feed is an inbox item similar to an email
+    message. They contain the text of the message and can optionally have
+    attachments.
     """
+    @property
+    def sender(self):
+        # type: () -> PIXUser
+        results = self['from']['list']
+        assert len(results) == 1
+        return results[0]
+
+    @property
+    def recipients(self):
+        # type: () -> List[PIXUser]
+        return self['to']['list']
+
+    @property
+    def message(self):
+        # type: () -> str
+        return self['text']
+
     def mark_as_read(self):
         """
         Mark's an item in logged-in user's inbox as read.
@@ -243,27 +280,9 @@ class PIXShareFeedEntry(PIXObject):
         """
         return self['attachments']['list']
 
-    def get_attachment(self, name):
-        # type: (str) -> PIXObject
-        """
-        Return the first attachment found with a specific name.
 
-        Parameters
-        ----------
-        name : str
-
-        Returns
-        -------
-        PIXObject
-        """
-        for x in self.get_attachments():
-            label = x.get('label')
-            if name == x['id'] or (label is not None and label == name):
-                return x
-
-
-@register('PIXClip')
-@register('PIXImage')
+@Factory.register('PIXClip')
+@Factory.register('PIXImage')
 class PIXAttachment(PIXObject):
     """
     Class representing an attached item.
@@ -292,13 +311,13 @@ class PIXAttachment(PIXObject):
         return []
 
 
-@register('PIXNote')
+@Factory.register('PIXNote')
 class PIXNote(PIXObject):
     """
     Class representing a note.
     """
     def get_media(self, media_type):
-        # type: (str) -> bytes
+        # type: (str) -> IO[str]
         """
         Get media from a note.
 
@@ -309,7 +328,7 @@ class PIXNote(PIXObject):
 
         Returns
         -------
-        bytes
+        IO[str]
         """
         # special original behavior if there is a start_frame
         if media_type == 'original' and \
@@ -325,6 +344,6 @@ class PIXNote(PIXObject):
             response = self.session.get(url)
 
         if response.status_code != 200:
-            raise pix.exc.PIXError(response.reason)
+            raise PIXError(response.reason)
 
         return response.content
