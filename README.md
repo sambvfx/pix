@@ -22,10 +22,12 @@ pip install ".[tests]"
 Basics
 ------
 
-Interacting with PIX requires a `Session` object. This is the object that manages all the API calls to PIX's REST endpoints. A session will login during instantiation.
+Interacting with PIX requires a `Session` object. This is the object that manages all the API calls to PIX's REST endpoints.
 
 ```python
 import pix
+
+
 session = pix.Session(
     app_url='https://project.pixsystem.com/developer/api/2',
     app_key='123abc',
@@ -48,6 +50,14 @@ $ export PIX_PLUGIN_PATH='/path/to/mypixmodels.py:/path/to/other/package'
 Once we have a session, before we issue any API calls a project needs to be activated. Returned results will change depending on the active project.
 
 ```python
+from __future__ import print_function
+import pix
+
+
+session = pix.Session()
+projects = session.get_projects()
+print(projects)
+# [<PIXProject('MyProject')>]
 project = session.load_project('MyProject')
 ```
 
@@ -129,6 +139,12 @@ class MyCustomProject(pix.PIXProject):
     """
     Custom project subclass
     """
+    def __init__(self, factory=None, *args, **kwargs):
+        if factory is None:
+            session = pix.Session()
+            factory = session.factory
+        super(MyCustomProject, self).__init__(factory, *args, **kwargs)
+
     def get_ingest_dir(self, date=None):
         # type: (Optional[str]) -> pathlib.Path
         """
@@ -190,7 +206,6 @@ class MyCustomProject(pix.PIXProject):
         return results
 
 
-session = pix.Session()
-project = MyCustomProject(session.factory, id='jurassicpark')
+project = MyCustomProject(id='jurassicpark')
 project.ingest()
 ```
