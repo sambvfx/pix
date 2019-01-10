@@ -278,7 +278,13 @@ class PIXShareFeedEntry(PIXObject):
         -------
         List[PIXAttachment]
         """
-        return self['attachments']['list']
+        results = []
+        for attachment in self['attachments']['list']:
+            if isinstance(attachment, PIXContainer):
+                results.extend(attachment.get_contents())
+            elif isinstance(attachment, PIXAttachment):
+                results.append(attachment)
+        return results
 
 
 @Factory.register('PIXClip')
