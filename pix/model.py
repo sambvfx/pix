@@ -136,7 +136,7 @@ class PIXProject(PIXObject):
     `_ActiveProject` metaclass for more information.
     """
     def load_item(self, item_id):
-        # type: (str) -> None
+        # type: (str) -> Optional[PIXObject]
         """
         Loads an item from PIX.
 
@@ -146,8 +146,11 @@ class PIXProject(PIXObject):
 
         Returns
         -------
+        Optional[PIXObject]
         """
-        return self.session.get('/items/{0}'.format(item_id))
+        result = self.session.get('/items/{0}'.format(item_id))
+        if isinstance(result, PIXObject):
+            return result
 
     def get_inbox(self, limit=None):
         # type: (Optional[int]) -> List[PIXShareFeedEntry]
@@ -287,8 +290,6 @@ class PIXShareFeedEntry(PIXObject):
         return results
 
 
-@Factory.register('PIXClip')
-@Factory.register('PIXImage')
 class PIXAttachment(PIXObject):
     """
     Class representing an attached item.
@@ -315,6 +316,16 @@ class PIXAttachment(PIXObject):
                 url += '?limit={0}'.format(limit)
             return self.session.get(url)
         return []
+
+
+@Factory.register('PIXClip')
+class PIXClip(PIXAttachment):
+    pass
+
+
+@Factory.register('PIXImage')
+class PIXImage(PIXAttachment):
+    pass
 
 
 @Factory.register('PIXNote')
