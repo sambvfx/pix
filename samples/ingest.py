@@ -15,10 +15,10 @@ Examples
 --------
 
 Default use:
-    python ingest.py "My Project Name" pix://item?50.3527.272761142 pix://item?22.3527.273122402
+    ingest.py "My Project Name" pix://item?50.3527.272761142 pix://item?22.3527.273122402
 
 Specify an output directory:
-    python ingest.py -d /path/to/folder "My Project Name" pix://item?50.3527.272761142
+    ingest.py -d /path/to/folder "My Project Name" pix://item?50.3527.272761142
 """
 from __future__ import print_function
 
