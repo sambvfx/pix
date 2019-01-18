@@ -56,6 +56,7 @@ class Factory(object):
         """
         def _deco(klass):
             bases = cls._registered.get(name, [])
+            bases = [x for x in bases if not issubclass(klass, x)]
             bases.append(klass)
             cls._registered[name] = bases
             return klass
