@@ -393,7 +393,7 @@ class Session(object):
         if isinstance(response, dict):
             if response.get('type') == 'bad_request':
                 raise PIXError(
-                    'Error fetching projects: {0}'.format(
+                    'Error fetching projects: {}'.format(
                         response.get('user_message')))
 
         response = cast(List[PIXProject], response)

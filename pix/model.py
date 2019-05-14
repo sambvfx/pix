@@ -32,7 +32,7 @@ class PIXObject(collections.MutableMapping):
                        for k, v in dict(*args, **kwargs).items()}
 
     def __repr__(self):
-        return '<{0}({1!r})>'.format(
+        return '<{}({!r})>'.format(
             self.__class__.__name__, str(self.identifier))
 
     def __getitem__(self, key):
@@ -148,7 +148,7 @@ class PIXProject(PIXObject):
         -------
         Optional[PIXObject]
         """
-        result = self.session.get('/items/{0}'.format(item_id))
+        result = self.session.get('/items/{}'.format(item_id))
         if isinstance(result, PIXObject):
             return result
 
@@ -167,7 +167,7 @@ class PIXProject(PIXObject):
         """
         url = '/feeds/incoming'
         if limit is not None:
-            url += '?limit={0}'.format(limit)
+            url += '?limit={}'.format(limit)
         return self.session.get(url)
 
     def mark_as_read(self, item):
@@ -180,7 +180,7 @@ class PIXProject(PIXObject):
         item : PIXObject
         """
         return self.session.put(
-            '/items/{0}'.format(item['id']),
+            '/items/{}'.format(item['id']),
             payload={'flags': {'viewed': 'true'}})
 
     def delete_inbox_item(self, item):
@@ -192,7 +192,7 @@ class PIXProject(PIXObject):
         ----------
         item : PIXObject
         """
-        return self.session.delete('/messages/inbox/{0}'.format(item['id']))
+        return self.session.delete('/messages/inbox/{}'.format(item['id']))
 
 
 @Factory.register('PIXUser')
@@ -221,7 +221,7 @@ class PIXContainer(PIXObject):
         -------
         List[Dict]
         """
-        return self.session.get('/items/{0}/contents'.format(self['id']))
+        return self.session.get('/items/{}/contents'.format(self['id']))
 
     def children(self):
         # type: () -> List[PIXObject]
@@ -269,7 +269,7 @@ class PIXShareFeedEntry(PIXObject):
         Mark's an item in logged-in user's inbox as read.
         """
         return self.session.put(
-            '/items/{0}'.format(self['id']),
+            '/items/{}'.format(self['id']),
             payload={'flags': {'viewed': 'true'}})
 
     def get_attachments(self):
@@ -294,28 +294,44 @@ class PIXAttachment(PIXObject):
     """
     Class representing an attached item.
     """
-    def get_notes(self, limit=None):
-        # type: (Optional[int]) -> List[PIXNote]
+    def iter_notes(self, limit=50, offset=0):
         """
-        Get notes.
+        Yield all notes for current item.
 
         Parameters
         ----------
-        limit : Optional[int]
-            Specify a limit of notes to return to the REST call.
-            NOTE: It appears the default limit if this argument is not
-                  provided is 50?
+        limit : int
+        offset : int
+
+        Returns
+        -------
+        Iterator[PIXNote]
+        """
+        if not self['notes']['has_notes']:
+            return
+
+        url = '/items/{}/notes?limit={}&offset={}'.format(
+            self['id'], limit, offset)
+
+        results = self.session.get(url)
+
+        for result in results:
+            yield result
+
+        if len(results) >= limit:
+            for result in self.iter_notes(limit=limit, offset=offset + limit):
+                yield result
+
+    def get_notes(self):
+        # type: () -> List[PIXNote]
+        """
+        Get all notes for the current item.
 
         Returns
         -------
         List[PIXNote]
         """
-        if self['notes']['has_notes']:
-            url = '/items/{0}/notes'.format(self['id'])
-            if limit is not None:
-                url += '?limit={0}'.format(limit)
-            return self.session.get(url)
-        return []
+        return list(self.iter_notes())
 
 
 @Factory.register('PIXClip')
@@ -351,11 +367,11 @@ class PIXNote(PIXObject):
         if media_type == 'original' and \
                 self['fields'].get('start_frame') is not None:
             headers = {'Accept': 'image/png'}
-            url = '/media/{0}/frame/{1}'.format(
+            url = '/media/{}/frame/{}'.format(
                 self['fields']['parent_id'], self['fields']['start_frame'])
         else:
             headers = {'Accept': 'text/xml'}
-            url = '/media/{0}/{1}'.format(self['id'], media_type)
+            url = '/media/{}/{}'.format(self['id'], media_type)
 
         with self.session.header(headers):
             response = self.session.get(url)
