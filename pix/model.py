@@ -295,6 +295,7 @@ class PIXAttachment(PIXObject):
     Class representing an attached item.
     """
     def iter_notes(self, limit=50, offset=0):
+        # type: (int, int) -> Iterator[PIXNote]
         """
         Yield all notes for current item.
 
