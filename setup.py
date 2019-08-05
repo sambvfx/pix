@@ -28,11 +28,13 @@ def version():
 
 
 setup(
-    name='pix',
+    name='pix-api',
     version=version(),
     description=__doc__,
     long_description=read('README.md'),
     author='Sam Bourne',
+    author_email='sambvfx@gmail.com',
+    url='https://github.com/sambvfx/pix',
     packages=['pix'],
     install_requires=[
         'six',
