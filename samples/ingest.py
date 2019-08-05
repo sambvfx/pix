@@ -32,6 +32,11 @@ import pix
 from typing import *
 
 
+if TYPE_CHECKING:
+    from pix.model import PIXImage
+    from pix.model import PIXClip
+
+
 @pix.register('PIXProject')
 class MyPIXProject(pix.model.PIXProject):
     """
@@ -69,6 +74,7 @@ class MyPIXProject(pix.model.PIXProject):
         )
 
     def _ingest_image(self, directory, item):
+        # type: (pathlib.Path, PIXImage) -> List[str]
         """
         Parameters
         ----------
@@ -105,6 +111,7 @@ class MyPIXProject(pix.model.PIXProject):
         return results
 
     def _ingest_clip(self, directory, item):
+        # type: (pathlib.Path, PIXClip) -> List[str]
         """
         Parameters
         ----------
@@ -132,7 +139,8 @@ class MyPIXProject(pix.model.PIXProject):
         try:
 
             with self.session.header({'Accept': 'video/quicktime'}):
-                result = self.session.get('/media/{}/original'.format(item['id']))
+                result = self.session.get(
+                    '/media/{}/original'.format(item['id']))
 
                 # Make sure we got back a proper result.
                 assert result.status_code == 200, result.reason
@@ -174,6 +182,7 @@ class MyPIXProject(pix.model.PIXProject):
         return output
 
     def ingest_from_app_urls(self, urls, directory=None):
+        # type: (List[str], Optional[Union[str, pathlib.Path]]) -> List[str]
         """
         Saves all marked down image notes.
 
@@ -287,5 +296,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     with pix.Session() as session:
-        project = session.load_project(args.project)  # type: MyPIXProject
-        project.ingest_from_app_urls(args.urls, directory=args.directory or None)
+        project = cast(MyPIXProject, session.load_project(args.project))
+        project.ingest_from_app_urls(
+            args.urls, directory=args.directory or None)

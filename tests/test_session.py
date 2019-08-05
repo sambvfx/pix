@@ -71,3 +71,24 @@ def test_project_load():
     session.load_project(project)
 
     assert session.active_project == project
+
+
+def test_expiry():
+    expiry = pix.api.Expiry(1)
+    if expiry:
+        pass
+    expiry.expires -= 2
+    if expiry:
+        raise RuntimeError('Should not get here.')
+
+
+def test_header():
+    session = pix.api.Session()
+
+    header = dict(session.headers)
+    header.update({'Accept': 'text/xml'})
+
+    assert session.headers != header
+
+    with session.header(header):
+        assert session.headers == header

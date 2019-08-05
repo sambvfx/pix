@@ -8,7 +8,7 @@ from .factory import register
 from .model import PIXObject, PIXProject
 
 
-__version__ = '0.4.1'
+__version__ = '0.5.0'
 __author__ = 'Sam Bourne'
 __contact__ = 'sambvfx@gmail.com'
 __license__ = 'MIT'

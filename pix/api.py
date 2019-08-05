@@ -72,7 +72,7 @@ class Expiry(object):
         """
         self.expires = time.time() + seconds
 
-    def __nonzero__(self):
+    def __bool__(self):
         # type: () -> bool
         """
         Returns
@@ -80,6 +80,8 @@ class Expiry(object):
         bool
         """
         return time.time() < self.expires
+
+    __nonzero__ = __bool__
 
 
 class Session(object):

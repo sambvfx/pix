@@ -3,15 +3,23 @@ A collection of pre-built PIX object/models.
 """
 import functools
 import six
-import collections
 
 from typing import *
+from typing import MutableMapping
+
+try:
+    from typing import GenericMeta
+except ImportError:
+    import abc
+
+    class GenericMeta(abc.ABCMeta):
+        pass
 
 from .factory import Factory
 from .exc import PIXError
 
 
-class PIXObject(collections.MutableMapping):
+class PIXObject(MutableMapping):
     """
     The base PIX object.
     """
