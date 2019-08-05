@@ -1,3 +1,10 @@
+PIX Python API
+--------------
+
+.. image:: https://travis-ci.org/sambvfx/pix.svg?branch=master
+   :target: https://travis-ci.org/sambvfx/pix
+   :alt: CI Status
+
 A python api for interacting with [PIX](http://www.pixsystem.com/). It's goal is to provide a more object-oriented experience when interacting with PIX's REST API. It provides simplified ways to add custom behaviors to the objects returned from PIX that are specific for your needs.
 
 
