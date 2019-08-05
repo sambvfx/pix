@@ -1,18 +1,18 @@
 A python api for interacting with [PIX](http://www.pixsystem.com/). It's goal is to provide a more object-oriented experience when interacting with PIX's REST API. It provides simplified ways to add custom behaviors to the objects returned from PIX that are specific for your needs.
 
 
-Setup
+Building
 -----
-First clone the repo somewhere.
+
+###### Install from source:
 
 ```bash
 git clone https://github.com/sambvfx/pix.git
 cd pix
-pip install -r requirements.txt .
+pip install .
 ```
 
-
-If you wish to contribute back please install the test dependencies using the `tests` bundle.
+> NOTE: If you wish to contribute back please install the tests dependencies using the `tests` bundle.
 
 ```bash
 pip install ".[tests]"
@@ -50,7 +50,6 @@ $ export PIX_PLUGIN_PATH='/path/to/mypixmodels.py:/path/to/other/package'
 Once we have a session, before we issue any API calls a project needs to be activated. Returned results will change depending on the active project.
 
 ```python
-from __future__ import print_function
 import pix
 
 
@@ -64,7 +63,6 @@ project = session.load_project('MyProject')
 From here we can issue some commands provided by our default [models](https://github.com/sambvfx/pix/blob/master/pix/model.py). For example getting all unread inbox messages.
 
 ```python
-from __future__ import print_function
 import pix
 
 
@@ -74,6 +72,7 @@ project = session.load_project('MyProject')
 
 # print unread inbox messages
 for feed in project.get_inbox():
+    # Skip stuff we've already marked as viewed.
     if feed['viewed']:
         continue
     print('{!r} -> {!r} : {!r}'.format(
@@ -91,11 +90,11 @@ Inject your own custom behaviors onto the dynamically created PIX objects. These
 ```python
 # mypixmodels.py
 
-from __future__ import print_function
 import pix
 
+
 @pix.register('PIXNote')
-class MyPIXNoteExtension(pix.PIXObject):
+class MyPIXNote(pix.PIXObject):
     def ingest(self):
         print('Ingesting note!')
         # handle note ingesting
@@ -106,11 +105,10 @@ As long as the `PIX_PLUGIN_PATH` has `mypixmodels.py` available the returned `PI
 ```python
 import pix
 
+
 with pix.Session() as session:
     project = session.load_project('MyProject')
     for feed in project.get_inbox():
-        if feed['viewed']:
-            continue
         for attachment in feed.get_attachments():
             for note in attachment.get_notes():
                 note.ingest()
