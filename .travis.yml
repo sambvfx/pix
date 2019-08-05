@@ -1,16 +1,20 @@
 language: python
-
 matrix:
   include:
-    - python: "2.7"
-      env: TOXENV=py27
-    - python: "3.7"
-      env: TOXENV=py37
-      dist: xenial
-      sudo: true
-
+  - python: '2.7'
+    env: TOXENV=py27
+  - python: '3.7'
+    env: TOXENV=py37
+    dist: xenial
+    sudo: true
 install:
-  - pip install tox
-
+- pip install tox
 script:
-  - tox
+- tox
+deploy:
+  provider: pypi
+  user: sambvfx
+  password:
+    secure: JkCXI1wS7b16PzR+ogoI+RG3G3zejkbKovd9fwYu3KxQAWM87Yu0Fozvv6C6jn+A1prAqIK6QcjyUpH1QDb5fzZm44WWVLBGuYzzEr08HiRQLCs0JeNNxORo5pNTnur3cxuIJeShdUUMfm+Ff3AltenlyLfyNuU3Lj99F6zToP0ZuqkfrM1PQsw8hgePkNORPf7lVjJhvAArRU2a3Cgfj3QYkKY8hmtkMczqZ687YaHcx16cHA0PAX2nersOBMae4sZcm4NpWO6/hRIQPVOC+56szY/DfMHJ4cel1p1afoEa1ZhhmLYcVA5Y7JL8HA7Q97O41zAq3LV0jhhwyfTJsqGm6wZZk4mjXUQI4bf4pq0z3wWCywZn0bXHuWGsXsmion8ywmx3/o8Z4/R6k9Y/aNNGhHJhWVSgrWJ5e5QnQXuCOXWzqROcxVch218vmu8pFjx0HpjYzGh9BpGslMDIC4ccQLQdobu3OugEQTvBLmL4EBsW+gYJbVnrmTDqqj+pEf7gip+JgcJXS7T/ZT2RSQWvFUBUkCENF54hv3BspHc9NrVgff4JCYq8fH58JzBwM4Rt+Qxp1s4nUM3qRTwlvQYTPAu6uK6464NBv+aQ46ZgPU4KK7B3Gl5YxL1CUeqldCNGtoJSWy5d8Iz+LkVWNyHnT0L8MlfOBtyzWRfbyEM=
+  on:
+    tags: true
