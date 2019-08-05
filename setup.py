@@ -32,6 +32,7 @@ setup(
     version=version(),
     description=__doc__,
     long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     author='Sam Bourne',
     author_email='sambvfx@gmail.com',
     url='https://github.com/sambvfx/pix',
