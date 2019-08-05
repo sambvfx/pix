@@ -1,6 +1,8 @@
 """
 Python PIX API provides a object-oriented and pythonic workflow for
-interacting with PIX's REST API.
+interacting with the provided REST API.
+
+https://pix.online/
 """
 import os
 import re
@@ -30,8 +32,8 @@ def version():
 setup(
     name='pix-api',
     version=version(),
-    description=__doc__,
-    # long_description=read('README.md'),
+    description='PIX Python API',
+    long_description=__doc__,
     # long_description_content_type='text/markdown',
     author='Sam Bourne',
     author_email='sambvfx@gmail.com',

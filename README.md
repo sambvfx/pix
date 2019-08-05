@@ -9,18 +9,26 @@ A python api for interacting with [PIX](http://www.pixsystem.com/). It's goal is
 Building
 -----
 
+###### Install from pypi:
+
+```bash
+pip install pix-api
+```
+
+*OR*
+
 ###### Install from source:
 
 ```bash
 git clone https://github.com/sambvfx/pix.git
 cd pix
-pip install .
+pip install -e .
 ```
 
 > NOTE: If you wish to contribute back please install the tests dependencies using the `tests` bundle.
 
 ```bash
-pip install ".[tests]"
+pip install -e ".[tests]"
 ```
 
 
