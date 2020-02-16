@@ -1,10 +1,6 @@
 .cache/
 .pytest_cache/
-.idea/
 .tox/
-venv/
-venv3/
 bin/
-.DS_Store
 *.pyc
 *.egg-info

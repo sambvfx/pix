@@ -6,8 +6,8 @@ https://pix.online/
 """
 import os
 import re
-from setuptools import setup
 
+from setuptools import setup
 
 _dirname = os.path.abspath(os.path.dirname(__file__))
 

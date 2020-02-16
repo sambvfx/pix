@@ -7,11 +7,10 @@ import sys
 import pytest
 
 import pix.api
-import pix.factory
-import pix.utils
 import pix.exc
+import pix.factory
 import pix.model
-
+import pix.utils
 
 _testdir = os.path.abspath(os.path.dirname(__file__))
 

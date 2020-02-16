@@ -1,6 +1,6 @@
 import os
-import pix.api
 
+import pix.api
 
 os.environ['PIX_API_URL'] = 'https://project.pixsystem.com/developer/api/2'
 os.environ['PIX_USERNAME'] = 'sambvfx'

@@ -22,19 +22,16 @@ Specify an output directory:
 """
 from __future__ import print_function
 
-import os
 import datetime
-
+import os
 import pathlib
+from typing import TYPE_CHECKING, cast
 
 import pix
-
-from typing import *
-
+from pix.model import PIXClip, PIXImage
 
 if TYPE_CHECKING:
-    from pix.model import PIXImage
-    from pix.model import PIXClip
+    from typing import DefaultDict, Optional, List, Union, Dict
 
 
 @pix.register('PIXProject')
@@ -106,7 +103,7 @@ class MyPIXProject(pix.model.PIXProject):
             with open(str(outpath), 'wb') as f:
                 f.write(result.content)
 
-            results.append(outpath)
+            results.append(str(outpath))
 
         return results
 
@@ -133,8 +130,8 @@ class MyPIXProject(pix.model.PIXProject):
 
         markup = defaultdict(list)  # type: DefaultDict[int, List[str]]
 
-        output = directory / '{}_composite.{}'.format(
-            *os.path.splitext(item['fields']['name']))
+        output = str(directory / '{}_composite.{}'.format(
+            *os.path.splitext(item['fields']['name'])))
 
         try:
 
@@ -179,7 +176,7 @@ class MyPIXProject(pix.model.PIXProject):
         finally:
             shutil.rmtree(str(tmpdir))
 
-        return output
+        return [output]
 
     def ingest_from_app_urls(self, urls, directory=None):
         # type: (List[str], Optional[Union[str, pathlib.Path]]) -> List[str]
@@ -215,15 +212,16 @@ class MyPIXProject(pix.model.PIXProject):
                 print('\nNo item found for {!r}'.format(url))
                 continue
             print('\nIngesting {!r}'.format(item))
-            if item['class'] == 'PIXClip':
-                results.append(self._ingest_clip(directory, item))
-            elif item['class'] == 'PIXImage':
+            if isinstance(item, PIXClip):
+                results.extend(self._ingest_clip(directory, item))
+            elif isinstance(item, PIXImage):
                 results.extend(self._ingest_image(directory, item))
 
         return results
 
 
 def stitch(base, markup, output):
+    # type: (str, Dict[int, List[str]], str) -> str
     """
     Overlay a clip with per-frame markup images.
 

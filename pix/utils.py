@@ -1,21 +1,22 @@
 """
 Utilities
 """
-import sys
 import os
-import six
+import sys
 import uuid
+from types import ModuleType
+from typing import TYPE_CHECKING, cast
+
+import six
 
 from .exc import PIXError
 
-from typing import *
-
-
-ModuleType = type(sys)
+if TYPE_CHECKING:
+    from typing import Union, Iterable, Iterator, List
 
 
 def iter_modules(paths):
-    # type: (Union[str, Iterable[str]]) -> List[str]
+    # type: (Union[str, Iterable[str]]) -> Iterator[str]
     """
     Get filepaths for all valid python modules from `paths`.
     
@@ -30,7 +31,7 @@ def iter_modules(paths):
 
     Returns
     -------
-    List[str]
+    Iterator[str]
     """
     import pydoc
 
@@ -45,7 +46,8 @@ def iter_modules(paths):
             continue
 
         obj = pydoc.locate(path)
-        if obj:
+        if obj and hasattr(obj, '__file__'):
+            obj = cast(ModuleType, obj)
             if obj.__file__.endswith('pyc'):
                 yield obj.__file__[:-1]
             else:

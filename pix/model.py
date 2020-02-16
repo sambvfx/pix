@@ -2,27 +2,50 @@
 A collection of pre-built PIX object/models.
 """
 import functools
+from typing import TYPE_CHECKING, Any, MutableMapping
+
 import six
 
-from typing import *
-from typing import MutableMapping
+from .exc import PIXError
+from .factory import Factory
 
 try:
     from typing import GenericMeta
 except ImportError:
     import abc
 
-    class GenericMeta(abc.ABCMeta):
+    class GenericMeta(abc.ABCMeta):  # type: ignore[no-redef]
         pass
 
-from .factory import Factory
-from .exc import PIXError
+if TYPE_CHECKING:
+    import requests
+    from typing import Any, Callable, IO, Iterator, List, Optional
+    from .api import Session
 
 
-class PIXObject(MutableMapping):
+__all__ = [
+    'PIXObject',
+    'PIXProject',
+    'PIXUser',
+    'PIXContainer',
+    'PIXShareFeedEntry',
+    'PIXAttachment',
+    'PIXClip',
+    'PIXImage',
+    'PIXNote',
+]
+
+
+class PIXObject(MutableMapping[str, Any]):
     """
     The base PIX object.
+
+    A PIXObject (or subclass of) is intended to wrap a dict-like object and
+    provide additional helper methods. These objects are not intended to be
+    initialized directly and should be built using the `Factory`. See the
+    `Factory` for more details.
     """
+
     def __init__(self, factory, *args, **kwargs):
         # type: (Factory, *Any, **Any) -> None
         """
@@ -34,8 +57,6 @@ class PIXObject(MutableMapping):
         kwargs : **Any
         """
         self.factory = factory
-        self.session = factory.session
-
         self._store = {k: self.factory.objectfy(v)
                        for k, v in dict(*args, **kwargs).items()}
 
@@ -57,6 +78,11 @@ class PIXObject(MutableMapping):
 
     def __setitem__(self, key, value):
         self._store[key] = value
+
+    @property
+    def session(self):
+        # type: () -> Session
+        return self.factory.session
 
     @property
     def identifier(self):
@@ -94,9 +120,10 @@ class _ActiveProject(GenericMeta):
     advantages of also affecting instance methods on sub-classes of
     `PIXProject`.
     """
+
     @staticmethod
     def activate_project(func):
-        # type: (Callable) -> Callable
+        # type: (Callable[..., Any]) -> Callable[..., Any]
         """
         Simple decorator for `PIXProject` methods that issue API calls to
         insures the project is set as the active project in the current 
@@ -104,11 +131,11 @@ class _ActiveProject(GenericMeta):
 
         Parameters
         ----------
-        func : Callable
+        func : Callable[..., Any]
 
         Returns
         -------
-        Callable
+        Callable[..., Any]
         """
         @functools.wraps(func)
         def _wrap(self, *args, **kwargs):
@@ -143,6 +170,7 @@ class PIXProject(PIXObject):
     session's active project when any instance methods are called. See 
     `_ActiveProject` metaclass for more information.
     """
+
     def load_item(self, item_id):
         # type: (str) -> Optional[PIXObject]
         """
@@ -159,6 +187,7 @@ class PIXProject(PIXObject):
         result = self.session.get('/items/{}'.format(item_id))
         if isinstance(result, PIXObject):
             return result
+        return None
 
     def get_inbox(self, limit=None):
         # type: (Optional[int]) -> List[PIXShareFeedEntry]
@@ -179,26 +208,34 @@ class PIXProject(PIXObject):
         return self.session.get(url)
 
     def mark_as_read(self, item):
-        # type: (PIXObject) -> None
+        # type: (PIXObject) -> requests.Response
         """
         Mark's an item in logged-in user's inbox as read.
 
         Parameters
         ----------
         item : PIXObject
+
+        Returns
+        -------
+        requests.Response
         """
         return self.session.put(
             '/items/{}'.format(item['id']),
             payload={'flags': {'viewed': 'true'}})
 
     def delete_inbox_item(self, item):
-        # type: (PIXObject) -> None
+        # type: (PIXObject) -> requests.Response
         """
         Delete item from the inbox.
 
         Parameters
         ----------
         item : PIXObject
+
+        Returns
+        -------
+        requests.Response
         """
         return self.session.delete('/messages/inbox/{}'.format(item['id']))
 
@@ -208,6 +245,7 @@ class PIXUser(PIXObject):
     """
     Class representing a user.
     """
+
     @property
     def name(self):
         # type: () -> str
@@ -220,14 +258,15 @@ class PIXContainer(PIXObject):
     """
     Container class requires an additional call to get its contents.
     """
+
     def get_contents(self):
-        # type: () -> List[Dict]
+        # type: () -> List[Any]
         """
         Gets the contents of a folder or playlist.
 
         Returns
         -------
-        List[Dict]
+        List[Any]
         """
         return self.session.get('/items/{}/contents'.format(self['id']))
 
@@ -255,6 +294,7 @@ class PIXShareFeedEntry(PIXObject):
     message. They contain the text of the message and can optionally have
     attachments.
     """
+
     @property
     def sender(self):
         # type: () -> PIXUser
@@ -302,6 +342,7 @@ class PIXAttachment(PIXObject):
     """
     Class representing an attached item.
     """
+
     def iter_notes(self, limit=50, offset=0):
         # type: (int, int) -> Iterator[PIXNote]
         """
@@ -345,12 +386,16 @@ class PIXAttachment(PIXObject):
 
 @Factory.register('PIXClip')
 class PIXClip(PIXAttachment):
-    pass
+    """
+    A clip attachment.
+    """
 
 
 @Factory.register('PIXImage')
 class PIXImage(PIXAttachment):
-    pass
+    """
+    An image attachment.
+    """
 
 
 @Factory.register('PIXNote')
@@ -358,6 +403,7 @@ class PIXNote(PIXObject):
     """
     Class representing a note.
     """
+
     def get_media(self, media_type):
         # type: (str) -> IO[str]
         """

@@ -3,22 +3,26 @@ Main PIX API module.
 """
 from __future__ import absolute_import
 
-import os
-import requests
 import json
-import six
+import os
 import time
-
 from typing import *
 
+import requests
+import six
+
+from .exc import PIXError, PIXLoginError
 from .factory import Factory
 from .model import PIXProject
-from .exc import PIXLoginError, PIXError
 from .utils import import_modules
-
 
 if TYPE_CHECKING:
     import requests.cookies
+
+
+__all__ = [
+    'Session',
+]
 
 
 class SessionHeader(object):
@@ -102,9 +106,9 @@ class Session(object):
     ...                 image_bytes = note.get_media('composite')
     """
 
-    def __init__(self, api_url=None, app_key=None, username=None, password=None,
-                 plugin_paths=None):
-        # type: (Optional[str], Optional[str], Optional[str], Optional[str], Optional[List[str]]) -> None
+    def __init__(self, api_url=None, app_key=None, username=None,
+                 password=None, plugin_paths=None):
+        # type: (Optional[str], Optional[str], Optional[str], Optional[str], Optional[Union[str, Iterable[str]]]) -> None
         """
         Parameters
         ----------
@@ -120,22 +124,43 @@ class Session(object):
         password : Optional[str]
             The PIX password associated with `username` used for logging in.
             If None, then the environment variable PIX_PASSWORD will be used.
-        plugin_paths : Optional[List[str]]
+        plugin_paths : Optional[Union[str, Iterable[str]]]
             Paths to custom modules or packages that should be loaded prior to 
             constructing any objects via the factory. This allows for 
             registration of any custom bases within the factory. If None, 
             the environment variable PIX_PLUGIN_PATH will be used.
         """
-        self.api_url = api_url or os.environ.get('PIX_API_URL')
-        self.app_key = app_key or os.environ.get('PIX_APP_KEY')
-        self.username = username or os.environ.get('PIX_USERNAME')
-        self.password = password or os.environ.get('PIX_PASSWORD')
+        if api_url is None:
+            api_url = os.environ.get('PIX_API_URL')
+        if app_key is None:
+            app_key = os.environ.get('PIX_APP_KEY')
+        if username is None:
+            username = os.environ.get('PIX_USERNAME')
+        if password is None:
+            password = os.environ.get('PIX_PASSWORD')
 
-        _creds = [x for x in ('api_url', 'app_key', 'username', 'password')
-                  if getattr(self, x) is None]
-        if _creds:
+        _missing_creds = [
+            x[0] for x in [
+                ('api_url', api_url),
+                ('app_key', app_key),
+                ('username', username),
+                ('password', password),
+            ] if not x[1]
+        ]
+
+        if _missing_creds:
             raise PIXLoginError('Missing login credentials: {}'.format(
-                ', '.join(_creds)))
+                ', '.join(_missing_creds)))
+
+        assert api_url, 'Invalid credentials: api_url'
+        assert app_key, 'Invalid credentials: app_key'
+        assert username, 'Invalid credentials: username'
+        assert password, 'Invalid credentials: password'
+
+        self.api_url = api_url  # type: str
+        self.app_key = app_key  # type: str
+        self.username = username  # type: str
+        self.password = password  # type: str
 
         plugin_paths = plugin_paths or os.environ.get('PIX_PLUGIN_PATH')
         if plugin_paths:
@@ -149,14 +174,14 @@ class Session(object):
             'Accept': 'application/json;charset=utf-8'
         }
 
-        self.cookies = None  # type: requests.cookies.RequestsCookieJar
+        self.cookies = None  # type: Optional[requests.cookies.RequestsCookieJar]
 
         # A time-out object representing the current session. Expires after a
         # set duration and is then refreshed.
-        self._session = None  # type: Expiry
+        self._session = None  # type: Optional[Expiry]
 
         # current active project
-        self.active_project = None  # type: PIXProject
+        self.active_project = None  # type: Optional[PIXProject]
 
     def __enter__(self):
         # type: () -> Session
@@ -232,14 +257,14 @@ class Session(object):
             headers=self.headers)
 
     def put(self, url, payload=None):
-        # type: (str, Optional[Dict]) -> requests.Response
+        # type: (str, Optional[Any]) -> requests.Response
         """
         PUT REST call
 
         Parameters
         ----------
         url : str
-        payload : Optional[Dict]
+        payload : Optional[Any]
 
         Returns
         -------
@@ -258,14 +283,14 @@ class Session(object):
             url=url, cookies=self.cookies, headers=self.headers, data=payload)
 
     def post(self, url, payload=None):
-        # type: (str, Optional[Dict]) -> requests.Response
+        # type: (str, Optional[Any]) -> requests.Response
         """
         POST REST call
 
         Parameters
         ----------
         url : str
-        payload : Optional[Dict]
+        payload : Optional[Any]
 
         Returns
         -------
@@ -284,14 +309,14 @@ class Session(object):
             url=url, cookies=self.cookies, headers=self.headers, data=payload)
 
     def delete(self, url, payload=None):
-        # type: (str, Optional[Dict]) -> requests.Response
+        # type: (str, Optional[Any]) -> requests.Response
         """
         DELETE REST call
 
         Parameters
         ----------
         url : str
-        payload : Optional[Dict]
+        payload : Optional[Any]
 
         Returns
         -------
@@ -310,7 +335,7 @@ class Session(object):
             url=url, cookies=self.cookies, headers=self.headers, data=payload)
 
     def get(self, url):
-        # type: (str) -> Union[requests.Response, Any]
+        # type: (str) -> Any
         """
         GET REST call
 
@@ -320,7 +345,7 @@ class Session(object):
 
         Returns
         -------
-        Union[requests.Response, Any]
+        Any
         """
         if not self._session:
             self.login()

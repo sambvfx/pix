@@ -1,15 +1,21 @@
 """
 PIX class factory module.
 """
-from typing import *
-
+from typing import TYPE_CHECKING, Mapping, overload
 
 if TYPE_CHECKING:
+    from typing import (
+        TypeVar, List, Dict, Callable, Iterator, Type, Any, Union, Set, Tuple
+    )
     from .api import Session
     from .model import PIXObject
 
+    T = TypeVar('T')
 
-T = TypeVar('T')
+
+__all__ = [
+    'Factory',
+]
 
 
 class Factory(object):
@@ -24,11 +30,11 @@ class Factory(object):
     A base class for a given PIX class can be registered via the `register`
     method given the PIX class name. Any structure returned from a PIX request
     that contains dictionaries with a key 'class' is premoted to an object
-    using any registered base classes (or ``pix.model.PIXObject`` if there are
+    using any registered base classes (or `pix.model.PIXObject` if there are
     none registered).
     """
     # registered bases
-    _registered = {}  # type: Dict[str, PIXObject]
+    _registered = {}  # type: Dict[str, List[Type[PIXObject]]]
 
     def __init__(self, session):
         # type: (Session) -> None
@@ -57,7 +63,7 @@ class Factory(object):
         def _deco(klass):
             bases = cls._registered.get(name, [])
             bases = [x for x in bases if not issubclass(klass, x)]
-            bases.append(klass)
+            bases.insert(0, klass)
             cls._registered[name] = bases
             return klass
 
@@ -65,11 +71,10 @@ class Factory(object):
 
     @classmethod
     def build(cls, name):
-        # type: (str) -> type
+        # type: (str) -> Type[PIXObject]
         """
         Build a pix object class with the given name. Any registered bases
-        keyed for `name` will be used or the base ``pix.model.PIXObject``
-        class.
+        keyed for `name` will be used as a base class.
 
         Parameters
         ----------
@@ -78,20 +83,22 @@ class Factory(object):
 
         Returns
         -------
-        type
-            Type[PIXObject]
+        Type[PIXObject]
         """
         # import here avoids circular import errors
         from .model import PIXObject
         # look for registered base classes and if none use the base object
-        bases = cls._registered.get(str(name), [PIXObject])
-        obj = type(str(name), tuple(bases), {})
-        obj.__name__ = str(name)
-        return obj
+        bases = cls._registered.get(str(name), [])
+        # ensure we have at least one PIXObject base class
+        if not any(issubclass(x, PIXObject) for x in bases):
+            bases.append(PIXObject)
+        klass = type(str(name), tuple(bases), {})  # type: Type[PIXObject]
+        klass.__name__ = str(name)
+        return klass
 
     @classmethod
     def iter_contents(cls, data):
-        # type: (Mapping) -> Generator[Mapping]
+        # type: (Mapping) -> Iterator[Mapping]
         """
         Iter the immediate contents of `data` and yield any dictionaries.
         Does not recurse.
@@ -102,7 +109,7 @@ class Factory(object):
 
         Returns
         -------
-        Generator[Mapping]
+        Iterator[Mapping]
         """
         for k, v in data.items():
             if isinstance(v, Mapping):
@@ -113,7 +120,7 @@ class Factory(object):
                         yield l
 
     def iter_children(self, data, recursive=True):
-        # type: (Mapping, bool) -> Generator[PIXObject]
+        # type: (Mapping, bool) -> Iterator[PIXObject]
         """
         Iterate over the children objects of `data`.
 
@@ -126,43 +133,77 @@ class Factory(object):
 
         Returns
         -------
-        Generator[PIXObject]
+        Iterator[PIXObject]
         """
         name = data.get('class')
         if name:
-            obj = self.build(name)
-            yield obj(self, data)
+            klass = self.build(name)
+            yield klass(self, data)
         if recursive:
             for x in self.iter_contents(data):
                 for obj in self.iter_children(x):
                     yield obj
 
+    @overload
     def objectfy(self, data):
-        # type: (T) -> Union[PIXObject, T]
+        # type: (PIXObject) -> PIXObject
+        pass
+
+    @overload
+    def objectfy(self, data):
+        # type: (Mapping[str, T]) -> Union[PIXObject, Mapping[str, Union[T, PIXObject]]]
+        pass
+
+    @overload
+    def objectfy(self, data):
+        # type: (List[T]) -> List[Union[PIXObject, T]]
+        pass
+
+    @overload
+    def objectfy(self, data):
+        # type: (Set[T]) -> Set[Union[PIXObject, T]]
+        pass
+
+    @overload
+    def objectfy(self, data):
+        # type: (Tuple[T, ...]) -> Tuple[Union[PIXObject, T], ...]
+        pass
+
+    # @overload
+    # def objectfy(self, data):
+    #     # type: (T) -> T
+    #     pass
+
+    def objectfy(self, data):
+        # type: (Any) -> Any
         """
         Replace any viable structures with `PIXObject`.
 
         Parameters
         ----------
-        data : T
+        data : Any
+            Can be a variety of types.
 
         Returns
         -------
-        Union[PIXObject, T]
+        Any
         """
-        if isinstance(data, MutableMapping):
+        from .model import PIXObject
+
+        if isinstance(data, PIXObject):
+            return data
+        elif isinstance(data, Mapping):
             name = data.get('class')
             if name:
-                obj = self.build(name)
-                return obj(self, data)
+                klass = self.build(name)
+                return klass(self, data)
             else:
-                return data.__class__(
+                # Mapping isn't a valid runtime type so data is some subclass.
+                # We want to maintain it's original type.
+                # NOTE: Hopefully order isn't important?
+                return data.__class__(  # type: ignore[call-arg]
                     {k: self.objectfy(v) for k, v in data.items()})
         elif isinstance(data, (list, tuple, set)):
             return data.__class__(self.objectfy(x) for x in data)
         else:
             return data
-
-
-# expose to make registration easier
-register = Factory.register

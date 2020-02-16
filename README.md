@@ -73,23 +73,29 @@ print(projects)
 project = session.load_project('MyProject')
 ```
 
-From here we can issue some commands provided by our default [models](https://github.com/sambvfx/pix/blob/master/pix/model.py). For example getting all unread inbox messages.
+The internals of `pix` are driven by a class [factory](https://github.com/sambvfx/pix/blob/master/pix/factory.py) that dynamically builds classes from the json data returned from the REST endpoints. Users have the ability to register base classes that are injected into these dynamic classes to provide customized behaviors.
+The objects created by the factory are dictionary-like objects where data returned by the servers can be accessed like a dictionary (e.g. `obj['key']`).
+
+There's a handful of provided [models](https://github.com/sambvfx/pix/blob/master/pix/model.py) that the dynamic objects will include by default. These provide helper methods for common use-cases.
 
 ```python
 import pix
 
 
 session = pix.Session()
+session.login()
 
 project = session.load_project('MyProject')
 
 # print unread inbox messages
 for feed in project.get_inbox():
+
+    # feed  # type: pix.model.PIXShareFeedEntry
+
     # Skip stuff we've already marked as viewed.
-    if feed['viewed']:
-        continue
-    print('{!r} -> {!r} : {!r}'.format(
-        feed.sender, feed.recipients, feed.message))
+    if not feed['viewed']:
+        print('{!r} -> {!r} : {!r}'.format(
+            feed.sender, feed.recipients, feed.message))
 
 session.logout()
 ```
@@ -98,7 +104,7 @@ session.logout()
 Extending
 ---------
 
-Inject your own custom behaviors onto the dynamically created PIX objects. These can exist in your own code repository and can be added to the [factory](https://github.com/sambvfx/pix/blob/master/pix/factory.py) via the environment variable `PIX_PLUGIN_PATH`.
+The provided [models](https://github.com/sambvfx/pix/blob/master/pix/model.py) have some standard helpful methods on them, but what about running your own logic? You can inject your own custom behaviors onto the dynamically created PIX objects. These can exist in your own code repository and can be added to the [factory](https://github.com/sambvfx/pix/blob/master/pix/factory.py) via the environment variable `PIX_PLUGIN_PATH`.
 
 ```python
 # mypixmodels.py
@@ -107,10 +113,10 @@ import pix
 
 
 @pix.register('PIXNote')
-class MyPIXNote(pix.PIXObject):
+class MyPIXNote:
+
     def ingest(self):
         print('Ingesting note!')
-        # handle note ingesting
 ```
 
 As long as the `PIX_PLUGIN_PATH` has `mypixmodels.py` available the returned `PIXNote` objects will have the custom `ingest` method on them.
@@ -119,6 +125,7 @@ As long as the `PIX_PLUGIN_PATH` has `mypixmodels.py` available the returned `PI
 import pix
 
 
+# When used as a context manager, a Session will automatically login/logout.
 with pix.Session() as session:
     project = session.load_project('MyProject')
     for feed in project.get_inbox():
