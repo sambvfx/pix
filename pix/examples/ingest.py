@@ -15,16 +15,19 @@ Examples
 --------
 
 Default use:
-    ingest.py "My Project Name" pix://item?50.3527.272761142 pix://item?22.3527.273122402
+    python -m pix.examples.ingest "My Project Name" pix://item?50.3527.272761142 pix://item?22.3527.273122402
 
 Specify an output directory:
-    ingest.py -d /path/to/folder "My Project Name" pix://item?50.3527.272761142
+    python -m pix.examples.ingest -d /path/to/folder "My Project Name" pix://item?50.3527.272761142
 """
 from __future__ import print_function
 
+import collections
 import datetime
 import os
 import pathlib
+import shutil
+import subprocess
 from typing import TYPE_CHECKING, cast
 
 import pix
@@ -62,7 +65,7 @@ class MyPIXProject(pix.model.PIXProject):
                 '~',
                 'projects',
                 'pix',
-                'samples',
+                '_data',
                 'projects',
                 self.identifier,
                 'notes',
@@ -122,13 +125,10 @@ class MyPIXProject(pix.model.PIXProject):
         List[str]
             List of output paths output.
         """
-        import shutil
-        from collections import defaultdict
-
         tmpdir = directory / '{}_tmp'.format(item['fields']['name'])
         tmpdir.mkdir()
 
-        markup = defaultdict(list)  # type: DefaultDict[int, List[str]]
+        markup = collections.defaultdict(list)  # type: DefaultDict[int, List[str]]
 
         output = str(directory / '{}_composite.{}'.format(
             *os.path.splitext(item['fields']['name'])))
@@ -139,16 +139,16 @@ class MyPIXProject(pix.model.PIXProject):
                 result = self.session.get(
                     '/media/{}/original'.format(item['id']))
 
-                # Make sure we got back a proper result.
-                assert result.status_code == 200, result.reason
+            # Make sure we got back a proper result.
+            assert result.status_code == 200, result.reason
 
-                outpath = tmpdir / 'original.mov'
+            outpath = tmpdir / 'original.mov'
 
-                # Write the mov file
-                with open(str(outpath), 'wb') as f:
-                    f.write(result.content)
+            # Write the mov file
+            with open(str(outpath), 'wb') as f:
+                f.write(result.content)
 
-                base = outpath
+            base = outpath
 
             for note in item.get_notes():
                 with self.session.header({'Accept': 'image/png'}):
@@ -235,8 +235,6 @@ def stitch(base, markup, output):
     -------
     str
     """
-    import subprocess
-
     assert os.path.exists(str(base))
 
     cmd = [
