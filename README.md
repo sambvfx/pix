@@ -6,7 +6,7 @@ PIX Python API
 A python api for interacting with [PIX](http://www.pixsystem.com/). It's goal is to provide a more pythonic and object-oriented experience when interacting with PIX's existing REST API. It provides a simple ways to custom objects returned from PIX that are specific for your needs.
 
 
-[![asciicast](https://asciinema.org/a/S7PEBiAwt4URAMneGLHkYBA1u.svg)](https://asciinema.org/a/S7PEBiAwt4URAMneGLHkYBA1u?speed=2)
+![overview](.repo/overview.gif)
 
 
 Quick Start
